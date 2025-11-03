@@ -3,10 +3,15 @@ package fr.ensibs.robots;
 import fr.ensibs.robots.factories.BattleFactory;
 import fr.ensibs.robots.logic.Battlefield;
 import fr.ensibs.robots.logic.Droid;
+import fr.ensibs.robots.logic.Robot;
+import fr.ensibs.robots.logic.TeamLeader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static fr.ensibs.robots.logic.BattleSetup.DROID_INITIAL_ENERGY;
+import java.util.Arrays;
+import java.util.List;
+
+import static fr.ensibs.robots.logic.BattleSetup.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -55,5 +60,39 @@ public class BattleFactoryTest
         assertEquals(DROID_INITIAL_ENERGY, droid.getEnergy(), "The droid initial energy is not valid");
         assertEquals(0, droid.getGunHeat(), "The droid initial heat is not valid");
         assertNotEquals(factory.makeDroid().getLocation(), droid.getLocation(), "Different droids initial locations should not be the same");
+    }
+
+    /**
+     * Tests for the {@link BattleFactory#makeRobot()} method
+     */
+    @Test
+    void testMakeRobot()
+    {
+        // create a robot instance
+        Robot robot = factory.makeRobot();
+
+        // check the method result
+        assertNotNull(robot, "The makeRobot method returned null");
+        assertEquals(ROBOT_INITIAL_ENERGY, robot.getEnergy(), "The robot initial energy is not valid");
+        assertEquals(0, robot.getGunHeat(), "The robot initial heat is not valid");
+        assertNotEquals(factory.makeRobot().getLocation(), robot.getLocation(), "Different robots initial locations should not be the same");
+    }
+
+    /**
+     * Tests for the {@link BattleFactory#makeTeamLeader(List)} method
+     */
+    @Test
+    void testMakeTeamLeader()
+    {
+        // create a leader instance
+        Droid[] droids = {factory.makeDroid(), factory.makeDroid(), factory.makeDroid(), factory.makeDroid()};
+        TeamLeader leader = factory.makeTeamLeader(Arrays.asList(droids));
+
+        // check the method result
+        assertNotNull(leader, "The makeTeamLeader method returned null");
+        assertEquals(ROBOT_INITIAL_ENERGY, leader.getEnergy(), "The leader initial energy is not valid");
+        assertEquals(0, leader.getGunHeat(), "The leader initial heat is not valid");
+        assertNotNull(leader.getTeammates(), "The leader teammates getter returned null");
+        assertArrayEquals(droids, leader.getTeammates().toArray(), "The leader teammates list is not valid");
     }
 }

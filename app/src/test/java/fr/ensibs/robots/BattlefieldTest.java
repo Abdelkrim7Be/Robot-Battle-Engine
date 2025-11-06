@@ -139,7 +139,7 @@ public class BattlefieldTest
 
         // initialize the expected result
         Location expected = new Location(droid.getLocation().getX(), FIELD_HEIGHT - ROBOT_RADIUS); // expected location after the collision
-        int nbMoves = Math.ceilDiv(FIELD_HEIGHT - droid.getLocation().getY(), MAX_DISTANCE_MOVE);     // nb of moves to move out of the field
+        int nbMoves = (int)Math.ceil((FIELD_HEIGHT - droid.getLocation().getY())/MAX_DISTANCE_MOVE);     // nb of moves to move out of the field
         int expectedEnergy = DROID_INITIAL_ENERGY - COLLISION_DAMAGE;                                 // expected energy after the collision
 
         // move until a collision occurs (going out of the field)
@@ -173,7 +173,7 @@ public class BattlefieldTest
         Droid droid2 = addSameLine(droid1);
 
         // initialize the expected result (should collide on the left of robot2)
-        int nbMoves = Math.ceilDiv(droid2.getLocation().getX() - droid1.getLocation().getX(), MAX_DISTANCE_MOVE);
+        int nbMoves = (int)Math.ceil((droid2.getLocation().getX() - droid1.getLocation().getX())/MAX_DISTANCE_MOVE);
         Location expected = new Location(droid2.getLocation().getX() - 2 * ROBOT_RADIUS, droid2.getLocation().getY());
         int expectedEnergy1 = droid1.getEnergy() - COLLISION_DAMAGE;
         int expectedEnergy2 = droid2.getEnergy() - COLLISION_DAMAGE;

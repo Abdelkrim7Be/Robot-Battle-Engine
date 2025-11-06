@@ -94,7 +94,7 @@ public class RobotTaskFactoryTest
         // check the result
         assertNotNull(classes);
         assertEquals(1, classes.size());
-        String actual = classes.getFirst().getName();
+        String actual = classes.get(0).getName();
         assertEquals(expected, actual, "Class " + expected + " not found");
     }
 
@@ -106,7 +106,7 @@ public class RobotTaskFactoryTest
     {
         // load the jar file and invoke the tested method
         factory.loadJar(jarFile);
-        Class<? extends RobotTask<Robot>> clazz = factory.listRobotClasses().getFirst();
+        Class<? extends RobotTask<Robot>> clazz = factory.listRobotClasses().get(0);
         RobotTask<Robot> result = factory.makeRobotTask(clazz);
 
         // check the result
@@ -121,7 +121,7 @@ public class RobotTaskFactoryTest
     {
         // load the jar file and invoke the tested method
         factory.loadJar(jarFile);
-        Class<? extends RobotTask<TeamLeader>> clazz = factory.listLeaderClasses().getFirst();
+        Class<? extends RobotTask<TeamLeader>> clazz = factory.listLeaderClasses().get(0);
         RobotTask<TeamLeader> result = factory.makeLeaderTask(clazz);
 
         // check the result

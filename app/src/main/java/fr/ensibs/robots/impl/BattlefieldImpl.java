@@ -32,6 +32,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 class BattlefieldImpl implements Battlefield
 {
     private final List<BaseDroid> robots = new CopyOnWriteArrayList<>();
+    private final List<Bullet> bullets = new CopyOnWriteArrayList<>();
     private final Random random = new Random();
 
     void register(BaseDroid droid)
@@ -99,11 +100,54 @@ class BattlefieldImpl implements Battlefield
     }
 
     /**
-     * Fires a bullet from the given robot. The bullet travels in the gun's direction
-     * and hits the closest valid target if any. Damage calculation follows the rules:
-     * - Base damage: 4 × power
-     * - Bonus damage (if power > 5): +2 × (power - 1)
-     * - Energy recovery on hit: 3 × power
+     * Calculate the damage a bullet will inflict based on its power.
+     * 
+     * <p>Damage formula:
+     * <ul>
+     *   <li>Base damage: 4 × power</li>
+     *   <li>If power > 1: add 2 × (power - 1)</li>
+     * </ul>
+     * 
+     * @param power the bullet power
+     * @return the total damage amount
+     */
+    public static int calculateDamage(int power)
+    {
+        int damage = 4 * power;
+        if (power > 1) {
+            damage += 2 * (power - 1);
+        }
+        return damage;
+    }
+    
+    /**
+     * Calculate the energy recovery (life steal) for the shooter when a bullet hits.
+     * 
+     * @param power the bullet power
+     * @return the energy recovery amount (3 × power)
+     */
+    public static int calculateLifeSteal(int power)
+    {
+        return 3 * power;
+    }
+    
+    /**
+     * Calculate the gun heat generated when firing a bullet.
+     * 
+     * @param power the bullet power
+     * @return the heat amount (1 + power / 5)
+     */
+    public static int calculateGunHeat(int power)
+    {
+        return 1 + power / 5;
+    }
+    
+    /**
+     * Fires a bullet from the given robot. Creates a Bullet entity that travels
+     * in the gun's direction and hits the closest valid target if any.
+     * 
+     * <p>Damage calculation uses {@link #calculateDamage(int)}.
+     * Energy recovery uses {@link #calculateLifeSteal(int)}.
      * 
      * @param robot the robot firing
      * @param firePower the bullet power (clamped to valid range)
@@ -122,16 +166,68 @@ class BattlefieldImpl implements Battlefield
             throw new GunOverheatedException(shooter.getGunHeat());
         }
         shooter.consumeEnergy(power);
-        shooter.increaseGunHeat(1 + power / 5);
+        shooter.increaseGunHeat(calculateGunHeat(power));
+        
+        // Create bullet entity
+        Location startLocation = shooter.getLocation();
+        double gunHeading = shooter.getGunHeading();
+        Bullet bullet = new Bullet(shooter, power, startLocation, gunHeading);
+        bullets.add(bullet);
+        
+        // Check for immediate hit (instant hit-scan for now)
+        // In future missions, bullets will travel over time
         BaseDroid target = findTarget(shooter);
         if (target != null) {
-            int damage = 4 * power;
-            if (power > 5) {
-                damage += 2 * (power - 1);
-            }
+            int damage = calculateDamage(power);
             target.adjustEnergy(-damage);
-            shooter.adjustEnergy(3 * power);
+            shooter.adjustEnergy(calculateLifeSteal(power));
+            bullet.deactivate(); // Bullet hit, deactivate it
         }
+    }
+    
+    /**
+     * Get all active bullets on the battlefield.
+     * 
+     * @return a list of active bullets
+     */
+    List<Bullet> getBullets()
+    {
+        return new ArrayList<>(bullets);
+    }
+    
+    /**
+     * Update all bullets by one game tick.
+     * This should be called each game loop iteration.
+     */
+    void updateBullets()
+    {
+        bullets.removeIf(bullet -> {
+            if (!bullet.isActive()) {
+                return true; // Remove inactive bullets
+            }
+            boolean stillActive = bullet.update();
+            if (!stillActive) {
+                return true; // Remove bullets that went out of bounds or exceeded range
+            }
+            // Check for collisions with robots
+            Location bulletLoc = bullet.getLocation();
+            for (BaseDroid robot : robots) {
+                if (robot == bullet.getOwner() || robot.getEnergy() <= 0) {
+                    continue;
+                }
+                double distSq = distanceSquared(bulletLoc, robot.getLocation());
+                double collisionDistSq = BattleSetup.ROBOT_RADIUS * BattleSetup.ROBOT_RADIUS;
+                if (distSq <= collisionDistSq) {
+                    // Bullet hit robot
+                    int damage = calculateDamage(bullet.getPower());
+                    robot.adjustEnergy(-damage);
+                    bullet.getOwner().adjustEnergy(calculateLifeSteal(bullet.getPower()));
+                    bullet.deactivate();
+                    return true; // Remove bullet
+                }
+            }
+            return false; // Keep bullet active
+        });
     }
 
     /**
@@ -313,7 +409,8 @@ class BattlefieldImpl implements Battlefield
     public void decreaseGunHeats()
     {
         for (BaseDroid droid : robots) {
-            droid.setGunHeat(Math.max(0, droid.getGunHeat() - BattleSetup.GUN_COOLING));
+            // Use Gun component's decreaseHeat method for proper encapsulation
+            droid.getGun().decreaseHeat(BattleSetup.GUN_COOLING);
         }
     }
 

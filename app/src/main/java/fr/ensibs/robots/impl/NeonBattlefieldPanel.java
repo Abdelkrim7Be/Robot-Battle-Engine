@@ -175,11 +175,10 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     {
         List<DroidView<? extends Droid>> views = getViews();
         
-        // DEBUG: Draw test robot at center if no robots loaded
-        if (views.isEmpty()) {
-            drawTestRobot(g2d, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
-        }
+        // ALWAYS draw test robot at center for visibility check
+        drawTestRobot(g2d, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
         
+        // Draw all robots
         for (DroidView<? extends Droid> view : views) {
             if (view.getRobot().getEnergy() > 0) {
                 // CRITICAL: Save transform before drawing each robot
@@ -198,18 +197,26 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     /**
      * Draw a test robot at specified coordinates to verify rendering pipeline.
+     * ALWAYS draw this to ensure robots are visible.
      */
     private void drawTestRobot(Graphics2D g2d, int x, int y)
     {
         AffineTransform original = g2d.getTransform();
         g2d.translate(x, y);
         
-        // Draw bright red test robot (high visibility)
+        // Draw HUGE bright red test robot (high visibility)
+        int size = 80; // Very large
         g2d.setColor(Color.RED);
-        g2d.fillOval(-10, -10, 20, 20);
+        g2d.fillRect(-size/2, -size/2, size, size);
         g2d.setColor(Color.WHITE);
-        g2d.setStroke(new BasicStroke(2.0f));
-        g2d.drawOval(-10, -10, 20, 20);
+        g2d.setStroke(new BasicStroke(4.0f));
+        g2d.drawRect(-size/2, -size/2, size, size);
+        
+        // Draw a cross to mark center
+        g2d.setColor(Color.YELLOW);
+        g2d.setStroke(new BasicStroke(3.0f));
+        g2d.drawLine(-size/2, 0, size/2, 0);
+        g2d.drawLine(0, -size/2, 0, size/2);
         
         g2d.setTransform(original);
     }

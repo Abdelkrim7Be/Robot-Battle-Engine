@@ -42,13 +42,19 @@ class SafeModeDroidView<R extends Droid> extends DroidView<R>
         // Rotate around center
         g2d.rotate(Math.toRadians(bodyHeading));
         
+        // CRITICAL: Make robots MUCH larger and brighter for visibility
         // Draw body centered at (0,0) after translation
-        g2d.setColor(Color.DARK_GRAY);
-        g2d.fillRect(-20, -20, 40, 40); // 40x40 box centered at origin
+        int size = 60; // MUCH LARGER: 60x60 instead of 40x40
+        int halfSize = size / 2;
         
-        g2d.setColor(teamColor); // Cyan or Red
-        g2d.setStroke(new BasicStroke(2));
-        g2d.drawRect(-20, -20, 40, 40); // Outline
+        // Bright fill color (not dark gray - too hard to see!)
+        g2d.setColor(new Color(100, 100, 100)); // Light gray fill
+        g2d.fillRect(-halfSize, -halfSize, size, size);
+        
+        // Bright, thick outline in team color
+        g2d.setColor(teamColor);
+        g2d.setStroke(new BasicStroke(4)); // Thicker outline
+        g2d.drawRect(-halfSize, -halfSize, size, size);
         
         g2d.setTransform(old); // RESET TRANSFORM
     }
@@ -70,9 +76,11 @@ class SafeModeDroidView<R extends Droid> extends DroidView<R>
         // Rotate gun independently
         g2d.rotate(Math.toRadians(gunHeading));
         
-        // Draw gun barrel (extends upward from center)
-        g2d.setColor(Color.GRAY);
-        g2d.fillRect(-3, -17, 6, 35); // 6x35 barrel, extends up from center
+        // Draw gun barrel (extends upward from center) - MUCH LARGER
+        g2d.setColor(Color.LIGHT_GRAY);
+        int gunWidth = 8; // Wider
+        int gunLength = 50; // Longer
+        g2d.fillRect(-gunWidth/2, -gunLength/2, gunWidth, gunLength);
         
         g2d.setTransform(old); // RESET TRANSFORM
     }

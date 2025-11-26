@@ -46,9 +46,11 @@ class SafeModeRobotView<R extends Robot> extends RobotView<R>
         // Rotate radar independently
         g2d.rotate(Math.toRadians(radarHeading));
         
-        // Draw radar dish (on top of gun, which extends to -17, so radar at -25)
+        // Draw radar dish (on top of gun) - MUCH LARGER
         g2d.setColor(Color.WHITE);
-        g2d.drawOval(-10, -25, 20, 20); // Simple circle above gun
+        int radarSize = 30; // Larger radar
+        g2d.setStroke(new BasicStroke(3)); // Thicker stroke
+        g2d.drawOval(-radarSize/2, -40, radarSize, radarSize); // Above gun
         
         g2d.setTransform(old); // RESET TRANSFORM
     }

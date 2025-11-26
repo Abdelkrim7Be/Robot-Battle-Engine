@@ -208,52 +208,57 @@ class BaseDroid implements Droid
      */
     private void processMessage(TeamMessage message)
     {
-        switch (message.getType()) {
-            case MOVE:
-                Double distance = message.getDataAsDouble();
-                if (distance != null) {
-                    move(distance);
-                }
-                break;
+        try {
+            switch (message.getType()) {
+                case MOVE:
+                    Double distance = message.getDataAsDouble();
+                    if (distance != null) {
+                        move(distance);
+                    }
+                    break;
+                    
+                case TURN_BODY:
+                    Double bodyAngle = message.getDataAsDouble();
+                    if (bodyAngle != null) {
+                        turnRobot(bodyAngle);
+                    }
+                    break;
+                    
+                case TURN_GUN:
+                    Double gunAngle = message.getDataAsDouble();
+                    if (gunAngle != null) {
+                        turnGun(gunAngle);
+                    }
+                    break;
+                    
+                case FIRE:
+                    Integer power = message.getDataAsInteger();
+                    if (power != null) {
+                        fire(power);
+                    }
+                    break;
                 
-            case TURN_BODY:
-                Double bodyAngle = message.getDataAsDouble();
-                if (bodyAngle != null) {
-                    turnRobot(bodyAngle);
-                }
-                break;
-                
-            case TURN_GUN:
-                Double gunAngle = message.getDataAsDouble();
-                if (gunAngle != null) {
-                    turnGun(gunAngle);
-                }
-                break;
-                
-            case FIRE:
-                Integer power = message.getDataAsInteger();
-                if (power != null) {
-                    fire(power);
-                }
-                break;
-                
-            case MOVE_TO:
-                Location target = message.getDataAsLocation();
-                if (target != null) {
-                    moveTo(target);
-                }
-                break;
-                
-            case AIM_AT:
-                Location aimTarget = message.getDataAsLocation();
-                if (aimTarget != null) {
-                    aimAt(aimTarget);
-                }
-                break;
-                
-            case BROADCAST:
-                // Custom message - can be handled by subclasses
-                break;
+                case MOVE_TO:
+                    Location target = message.getDataAsLocation();
+                    if (target != null) {
+                        moveTo(target);
+                    }
+                    break;
+                    
+                case AIM_AT:
+                    Location aimTarget = message.getDataAsLocation();
+                    if (aimTarget != null) {
+                        aimAt(aimTarget);
+                    }
+                    break;
+                    
+                case BROADCAST:
+                    // Custom message - can be handled by subclasses
+                    break;
+            }
+        } catch (CollisionException | ExhaustedException | GunOverheatedException e) {
+            // Silently ignore exceptions from message processing
+            // (e.g., collision, exhausted, overheated)
         }
     }
     

@@ -275,6 +275,20 @@ class BattlefieldImpl implements Battlefield
             .filter(robot -> robot.getEnergy() > 0)
             .count();
     }
+    
+    /**
+     * Process team messages for all droids.
+     * This should be called each game loop iteration after leader tasks run
+     * but before individual robot tasks.
+     */
+    void processTeamMessages()
+    {
+        for (BaseDroid droid : robots) {
+            if (droid.getEnergy() > 0) {
+                droid.processMessages();
+            }
+        }
+    }
 
     /**
      * Finds the closest valid target in the gun's line of fire.

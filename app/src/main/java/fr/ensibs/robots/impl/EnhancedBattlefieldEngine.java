@@ -113,7 +113,10 @@ public class EnhancedBattlefieldEngine
         // Step 3: Remove dead robots (energy <= 0)
         battlefieldImpl.removeDeadRobots();
         
-        // Step 4: Execute robot tasks in random order (only for alive robots)
+        // Step 4: Process team messages (droids react to leader commands)
+        battlefieldImpl.processTeamMessages();
+        
+        // Step 5: Execute robot tasks in random order (only for alive robots)
         Collections.shuffle(tasks, RANDOM);
         for (RobotTask<? extends Robot> task : tasks) {
             if (task.getRobot().getEnergy() > 0) {

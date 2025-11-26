@@ -38,12 +38,19 @@ class SafeModeRobotView<R extends Robot> extends RobotView<R>
         double radarHeading = getRobot().getRadarHeading();
         
         // SAFE MODE: Simple circle
-        // 3. Draw Radar (The Dish)
+        // CRITICAL FIX: Translate to center, rotate, then draw centered
         AffineTransform old = g2d.getTransform();
-        g2d.rotate(Math.toRadians(radarHeading), x, y);
+        
+        // Translate to robot center
+        g2d.translate(x, y);
+        // Rotate radar independently
+        g2d.rotate(Math.toRadians(radarHeading));
+        
+        // Draw radar dish (on top of gun, which extends to -17, so radar at -25)
         g2d.setColor(Color.WHITE);
-        g2d.drawOval((int)x - 10, (int)y - 10, 20, 20); // Simple circle
-        g2d.setTransform(old); // RESET ROTATION
+        g2d.drawOval(-10, -25, 20, 20); // Simple circle above gun
+        
+        g2d.setTransform(old); // RESET TRANSFORM
     }
 }
 

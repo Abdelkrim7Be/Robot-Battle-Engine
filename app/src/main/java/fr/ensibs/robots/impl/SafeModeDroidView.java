@@ -34,18 +34,23 @@ class SafeModeDroidView<R extends Droid> extends DroidView<R>
         }
         
         // SAFE MODE: Simple rectangle with body rotation
-        // 1. Draw Body (The Tank) - MUST rotate by bodyHeading
+        // CRITICAL FIX: Translate to center, rotate, then draw centered at (0,0)
         AffineTransform old = g2d.getTransform();
-        g2d.rotate(Math.toRadians(bodyHeading), x, y);
         
+        // Translate to robot center
+        g2d.translate(x, y);
+        // Rotate around center
+        g2d.rotate(Math.toRadians(bodyHeading));
+        
+        // Draw body centered at (0,0) after translation
         g2d.setColor(Color.DARK_GRAY);
-        g2d.fillRect((int)x - 20, (int)y - 20, 40, 40); // 40x40 box centered
+        g2d.fillRect(-20, -20, 40, 40); // 40x40 box centered at origin
         
         g2d.setColor(teamColor); // Cyan or Red
         g2d.setStroke(new BasicStroke(2));
-        g2d.drawRect((int)x - 20, (int)y - 20, 40, 40); // Outline
+        g2d.drawRect(-20, -20, 40, 40); // Outline
         
-        g2d.setTransform(old); // RESET ROTATION
+        g2d.setTransform(old); // RESET TRANSFORM
     }
     
     @Override
@@ -57,12 +62,19 @@ class SafeModeDroidView<R extends Droid> extends DroidView<R>
         double gunHeading = getRobot().getGunHeading();
         
         // SAFE MODE: Simple rectangle with rotation
-        // 2. Draw Gun (The Turret)
+        // CRITICAL FIX: Translate to center, rotate, then draw centered
         AffineTransform old = g2d.getTransform();
-        g2d.rotate(Math.toRadians(gunHeading), x, y);
+        
+        // Translate to robot center
+        g2d.translate(x, y);
+        // Rotate gun independently
+        g2d.rotate(Math.toRadians(gunHeading));
+        
+        // Draw gun barrel (extends upward from center)
         g2d.setColor(Color.GRAY);
-        g2d.fillRect((int)x - 3, (int)y - 5, 6, 35); // Simple barrel
-        g2d.setTransform(old); // RESET ROTATION
+        g2d.fillRect(-3, -17, 6, 35); // 6x35 barrel, extends up from center
+        
+        g2d.setTransform(old); // RESET TRANSFORM
     }
 }
 

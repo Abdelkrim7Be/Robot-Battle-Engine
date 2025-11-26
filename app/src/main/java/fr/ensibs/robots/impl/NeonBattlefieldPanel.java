@@ -1,6 +1,7 @@
 package fr.ensibs.robots.impl;
 
 import fr.ensibs.robots.logic.Droid;
+import fr.ensibs.robots.logic.Location;
 import fr.ensibs.robots.view.BattlefieldPanel;
 import fr.ensibs.robots.view.DroidView;
 
@@ -110,17 +111,20 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         drawDangerZoneBorders(g2d);
         
         // STEP 5: ENTITIES - Draw robots (BEFORE bullets)
-        // DEBUG: Log robot positions for one frame (uncomment to debug)
-        // if (frameCount % 60 == 0) { // Log every 60 frames
-        //     List<DroidView<? extends Droid>> views = getViews();
-        //     for (DroidView<? extends Droid> view : views) {
-        //         Location loc = view.getRobot().getLocation();
-        //         double screenX = loc.getX() * scale + marginX;
-        //         double screenY = loc.getY() * scale + marginY;
-        //         System.out.printf("[RENDER_DEBUG] %s: LogicPos(%d,%d) -> ScreenPos(%.1f,%.1f) | Color: %s%n",
-        //             view.getName(), loc.getX(), loc.getY(), screenX, screenY, view.getColor());
-        //     }
-        // }
+        // DEBUG: Log robot positions for diagnostic
+        List<DroidView<? extends Droid>> debugViews = getViews();
+        if (!debugViews.isEmpty()) {
+            System.out.printf("[RENDER_DEBUG] Frame: %d robots, scale=%.3f, margin=(%.1f,%.1f)%n", 
+                debugViews.size(), scale, marginX, marginY);
+            for (DroidView<? extends Droid> view : debugViews) {
+                Location loc = view.getRobot().getLocation();
+                double screenX = loc.getX() * scale + marginX;
+                double screenY = loc.getY() * scale + marginY;
+                System.out.printf("[RENDER_DEBUG] %s: LogicPos(%d,%d) -> ScreenPos(%.1f,%.1f) | Energy=%d | Color=%s%n",
+                    view.getName(), loc.getX(), loc.getY(), screenX, screenY, 
+                    view.getRobot().getEnergy(), view.getColor());
+            }
+        }
         drawRobots(g2d);
         
         // STEP 6: Bullets

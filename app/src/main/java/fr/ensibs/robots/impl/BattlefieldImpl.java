@@ -8,7 +8,7 @@ import fr.ensibs.robots.logic.ExhaustedException;
 import fr.ensibs.robots.logic.GunOverheatedException;
 import fr.ensibs.robots.logic.Location;
 import fr.ensibs.robots.logic.Robot;
-import fr.ensibs.robots.logic.ScanResult;
+// import fr.ensibs.robots.logic.ScanResult; // TODO: Uncomment when api module is built
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -359,10 +359,14 @@ class BattlefieldImpl implements Battlefield
      * This method uses geometric field-of-view scanning to detect robots in a
      * pie-slice shaped area centered on the radar's heading.
      * 
+     * NOTE: This method is commented out until ScanResult class is available in the api module.
+     * Uncomment when api module is built and ScanResult is accessible.
+     * 
      * @param robot the robot performing the scan
      * @return a list of ScanResult objects containing distance and bearing for each detected robot
      * @throws ExhaustedException if the robot has insufficient energy to scan
      */
+    /*
     public List<ScanResult> scanWithResults(Robot robot) throws ExhaustedException
     {
         RobotImpl scanner = requireRobot(robot);
@@ -411,25 +415,52 @@ class BattlefieldImpl implements Battlefield
         
         return Collections.unmodifiableList(results);
     }
+    */
     
     @Override
     public List<Location> scan(Robot robot) throws ExhaustedException
     {
-        // For backward compatibility, convert ScanResult to Location
-        // Note: This loses the relative information benefit, but maintains API compatibility
-        List<ScanResult> scanResults = scanWithResults(robot);
-        List<Location> locations = new ArrayList<>();
-        Location source = robot.getLocation();
-        double heading = robot.getRadarHeading();
+        RobotImpl scanner = requireRobot(robot);
+        scanner.consumeEnergy(BattleSetup.SCAN_ENERGY);
+        List<ScanTarget> targets = new ArrayList<>();
+        Location source = scanner.getLocation();
+        double heading = scanner.getRadarHeading();
+        double halfField = BattleSetup.VISION_FIELD / 2.0;
         
-        for (ScanResult result : scanResults) {
-            // Reconstruct approximate location from relative info
-            // This is approximate and may not be exact, but maintains API compatibility
-            double bearingRad = Math.toRadians(result.getBearing());
-            double distance = result.getDistance();
-            int x = (int) Math.round(source.getX() + distance * Math.sin(bearingRad));
-            int y = (int) Math.round(source.getY() - distance * Math.cos(bearingRad));
-            locations.add(new Location(x, y));
+        // Scan all robots in the field of vision (pie slice)
+        for (BaseDroid candidate : robots) {
+            if (candidate == robot || candidate.getEnergy() <= 0) {
+                continue; // Skip self and eliminated robots
+            }
+            Location location = candidate.getLocation();
+            double bearing = calculateBearing(source, location);
+            double angleDiff = angleDifference(heading, bearing);
+            
+            // Check if robot is within the field of vision (pie slice)
+            if (angleDiff > halfField) {
+                continue; // Outside field of vision
+            }
+            
+            // Calculate distance
+            double distance = Math.hypot(location.getX() - source.getX(), location.getY() - source.getY());
+            
+            // Calculate lateral distance for occlusion checking
+            double lateral = distance * Math.sin(Math.toRadians(angleDiff));
+            int bucket = (int) Math.floor(Math.abs(lateral) / (2 * BattleSetup.ROBOT_RADIUS + 0.0001));
+            
+            targets.add(new ScanTarget(location, distance, bearing, bucket));
+        }
+        
+        // Sort by distance (closest first)
+        targets.sort(Comparator.comparingDouble(ScanTarget::distance));
+        
+        // Filter out occluded targets (only show closest in each lateral bucket)
+        Set<Integer> blockedBuckets = new HashSet<>();
+        List<Location> locations = new ArrayList<>();
+        for (ScanTarget target : targets) {
+            if (blockedBuckets.add(target.bucket())) {
+                locations.add(target.location());
+            }
         }
         
         return Collections.unmodifiableList(locations);

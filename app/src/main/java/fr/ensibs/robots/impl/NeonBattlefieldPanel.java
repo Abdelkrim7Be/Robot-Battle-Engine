@@ -64,17 +64,17 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     @Override
     protected void paintComponent(Graphics g)
     {
-        // CRITICAL: Call super FIRST to clear and set up rendering context
-        super.paintComponent(g);
+        // CRITICAL FIX: Do NOT call super.paintComponent() - it draws robots on white background!
+        // We handle everything ourselves with correct order
         
         Graphics2D g2d = (Graphics2D) g;
         
-        // SAFE MODE: CLEAR SCREEN FIRST - The VERY FIRST thing
+        // STEP 1: WIPE - Clear screen FIRST (fixes ghosting)
         int panelWidth = getWidth();
         int panelHeight = getHeight();
         g2d.setColor(Color.BLACK);
-        g2d.clearRect(0, 0, panelWidth, panelHeight); // Clear first
-        g2d.fillRect(0, 0, panelWidth, panelHeight); // Then fill
+        g2d.clearRect(0, 0, panelWidth, panelHeight);
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
         
         // Calculate FPS
         long currentTime = System.nanoTime();
@@ -84,43 +84,52 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         }
         lastFrameTime = currentTime;
         
-        // Disable expensive rendering hints for performance
+        // Performance: Disable expensive rendering
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
         
-        // Compute scale and margins
+        // Compute scale and margins for coordinate transformation
         double scale = Math.min(panelWidth * 1.0d / FIELD_WIDTH, panelHeight * 1.0d / FIELD_HEIGHT);
         double marginX = (panelWidth - FIELD_WIDTH * scale) / 2;
         double marginY = (panelHeight - FIELD_HEIGHT * scale) / 2;
         
+        // Save original transform
         AffineTransform originalTransform = g2d.getTransform();
+        
+        // Apply battlefield coordinate transform
         g2d.setTransform(new AffineTransform(scale, 0, 0, scale, marginX, marginY));
         
-        // Clear battlefield area
+        // STEP 2: Clear battlefield area (dark background)
         g2d.setColor(BACKGROUND_DARK);
         g2d.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
         
-        // STRICT RENDERING ORDER (performance optimized):
-        // 1. Grid (radar-style dark green)
+        // STEP 3: GRID - Draw grid lines (dark green)
         drawDigitalGrid(g2d);
         
-        // 2. Borders
+        // STEP 4: BORDERS
         drawDangerZoneBorders(g2d);
         
-        // 3. Robots (BEFORE bullets so they're visible)
+        // STEP 5: ENTITIES - Draw robots (BEFORE bullets)
+        // DEBUG: Log robot positions for one frame (uncomment to debug)
+        // if (frameCount % 60 == 0) { // Log every 60 frames
+        //     List<DroidView<? extends Droid>> views = getViews();
+        //     for (DroidView<? extends Droid> view : views) {
+        //         Location loc = view.getRobot().getLocation();
+        //         double screenX = loc.getX() * scale + marginX;
+        //         double screenY = loc.getY() * scale + marginY;
+        //         System.out.printf("[RENDER_DEBUG] %s: LogicPos(%d,%d) -> ScreenPos(%.1f,%.1f) | Color: %s%n",
+        //             view.getName(), loc.getX(), loc.getY(), screenX, screenY, view.getColor());
+        //     }
+        // }
         drawRobots(g2d);
         
-        // 4. Bullets and trails (minimal effects for performance)
+        // STEP 6: Bullets
         drawAdditionalEntities(g2d);
-        
-        // DISABLED: Muzzle flashes and particles for performance
-        // muzzleFlashSystem.draw(g2d);
-        // particleSystem.draw(g2d);
         
         // Restore transform for screen-space drawing
         g2d.setTransform(originalTransform);
         
-        // Draw FPS counter (debug)
+        // STEP 7: UI OVERLAY - Draw FPS counter (last)
         drawFPS(g2d);
     }
     
@@ -155,8 +164,8 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     }
     
     /**
-     * Draw robots with damage flash overlay.
-     * CRITICAL: Ensure robots are visible with high contrast colors.
+     * Draw robots - STRICT ORDER: Save transform, translate, rotate, draw, restore.
+     * CRITICAL: Each robot must save/restore transform to prevent corruption.
      */
     private void drawRobots(Graphics2D g2d)
     {
@@ -169,9 +178,16 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         
         for (DroidView<? extends Droid> view : views) {
             if (view.getRobot().getEnergy() > 0) {
-                view.draw(g2d);
-                // Apply damage flash if needed
-                damageFlashSystem.drawFlash(g2d, view);
+                // CRITICAL: Save transform before drawing each robot
+                AffineTransform savedTransform = g2d.getTransform();
+                
+                try {
+                    // Draw robot (view handles its own transforms)
+                    view.draw(g2d);
+                } finally {
+                    // ALWAYS restore transform to prevent corruption
+                    g2d.setTransform(savedTransform);
+                }
             }
         }
     }

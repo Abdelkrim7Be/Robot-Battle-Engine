@@ -26,20 +26,26 @@ class SafeModeDroidView<R extends Droid> extends DroidView<R>
         Location location = getRobot().getLocation();
         double x = location.getX();
         double y = location.getY();
+        double bodyHeading = getRobot().getHeading();
         
         Color teamColor = getColor();
         if (getRobot().getEnergy() <= 0) {
             teamColor = new Color(50, 50, 50); // Dark gray when dead
         }
         
-        // SAFE MODE: Simple rectangle, no transforms
-        // 1. Draw Body (The Tank)
+        // SAFE MODE: Simple rectangle with body rotation
+        // 1. Draw Body (The Tank) - MUST rotate by bodyHeading
+        AffineTransform old = g2d.getTransform();
+        g2d.rotate(Math.toRadians(bodyHeading), x, y);
+        
         g2d.setColor(Color.DARK_GRAY);
         g2d.fillRect((int)x - 20, (int)y - 20, 40, 40); // 40x40 box centered
         
         g2d.setColor(teamColor); // Cyan or Red
         g2d.setStroke(new BasicStroke(2));
         g2d.drawRect((int)x - 20, (int)y - 20, 40, 40); // Outline
+        
+        g2d.setTransform(old); // RESET ROTATION
     }
     
     @Override

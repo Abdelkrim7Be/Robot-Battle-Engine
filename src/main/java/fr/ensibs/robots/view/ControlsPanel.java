@@ -26,7 +26,7 @@ import static fr.ensibs.robots.logic.BattleSetup.NB_TEAMMATES;
 public class ControlsPanel extends JPanel implements ActionListener
 {
     // actions names
-    private static final String START = "Start", STOP = "Stop", LOAD = "Load robots";
+    private static final String START = "Start", STOP = "Stop";
 
     private final Battlefield battlefield;      // the battlefield instance
     private final BattlefieldEngine engine;     // the engine that runs the robots tasks periodically
@@ -34,7 +34,7 @@ public class ControlsPanel extends JPanel implements ActionListener
     private final BattleFactory factory;        // factory to make robots
     private final RobotTaskFactory taskFactory; // factory to make tasks
 
-    private JButton loadButton, startButton;    // buttons that should be enabled/disabled
+    private JButton startButton;    // start/stop button
     private JTable robotsTable;                 // table that displays the robots states
 
     /**
@@ -56,6 +56,8 @@ public class ControlsPanel extends JPanel implements ActionListener
         this.engine = new BattlefieldEngine(battlefield, 100);
 
         initComponents();
+        // Auto-load robots after UI is ready
+        SwingUtilities.invokeLater(this::autoLoadRobots);
     }
 
     @Override
@@ -78,30 +80,6 @@ public class ControlsPanel extends JPanel implements ActionListener
             case STOP: // start/stop button clicked
                 startStop();
                 break;
-            case LOAD: // load button clicked
-                loadRobots();
-                break;
-        }
-    }
-
-    /**
-     * Method invoked when the LOAD button is clicked. Open a RobotFactoryDialog,
-     * and then add the new robots (if any) to the battlefield
-     */
-    private void loadRobots()
-    {
-        // open the factory dialog
-        Window owner = SwingUtilities.getWindowAncestor(this);
-        RobotFactoryDialog dialog = new RobotFactoryDialog(owner, taskFactory);
-        dialog.pack();
-        dialog.setVisible(true);
-        // dialog closed: get the new robots
-        Class<? extends RobotTask<Robot>> robotClass = dialog.getRobotClass();
-        Class<? extends RobotTask<TeamLeader>> leaderClass = dialog.getLeaderClass();
-        if (robotClass != null) {
-            makeRobot(robotClass, dialog.getColor());
-        } else if (leaderClass != null) {
-            makeTeam(leaderClass, dialog.getColor());
         }
     }
 
@@ -151,8 +129,17 @@ public class ControlsPanel extends JPanel implements ActionListener
     {
         boolean start = startButton.getText().equals(START);
         startButton.setText(start ? STOP : START);
-        loadButton.setEnabled(!start);
         if (start) {
+            // If starting and no robots loaded, automatically load them first
+            if (views.isEmpty()) {
+                autoLoadRobots();
+                // Update table after auto-load
+                if (robotsTable != null) {
+                    SwingUtilities.invokeLater(() -> {
+                        ((RobotsTableModel) robotsTable.getModel()).fireTableDataChanged();
+                    });
+                }
+            }
             engine.start();
         } else {
             engine.stop();
@@ -164,11 +151,8 @@ public class ControlsPanel extends JPanel implements ActionListener
      */
     private void initComponents()
     {
-        // LOAD and START/STOP buttons
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 5, 5));
-        loadButton = new JButton(LOAD);
-        loadButton.addActionListener(this);
-        buttonPanel.add(loadButton);
+        // START/STOP button only (no manual load button)
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 1, 5, 5));
         startButton = new JButton(START);
         startButton.addActionListener(this);
         buttonPanel.add(startButton);
@@ -272,5 +256,113 @@ public class ControlsPanel extends JPanel implements ActionListener
             setHorizontalAlignment(col == 1 ? JLabel.CENTER : JLabel.LEFT);
             return this;
         }
+    }
+    
+    /**
+     * Automatically load all robots from the examples.jar file.
+     * Creates one instance of each robot class and one team leader with teammates.
+     */
+    private void autoLoadRobots()
+    {
+        try {
+            // Try to find examples.jar in common locations
+            java.io.File jarFile = findExamplesJar();
+            if (jarFile == null || !jarFile.exists()) {
+                System.err.println("Warning: examples.jar not found. No robots will be loaded automatically.");
+                return;
+            }
+
+            // Load the JAR file
+            taskFactory.loadJar(jarFile);
+
+            // Predefined colors for robots
+            Color[] colors = {
+                Color.BLUE, Color.RED, Color.GREEN, Color.ORANGE, Color.MAGENTA,
+                Color.CYAN, Color.PINK, Color.YELLOW, new Color(128, 0, 128), // Purple
+                new Color(255, 165, 0), // Orange
+                new Color(0, 128, 128), // Teal
+                new Color(255, 192, 203) // Pink
+            };
+
+            int colorIndex = 0;
+
+            // Load all robot classes
+            List<Class<? extends RobotTask<Robot>>> robotClasses = taskFactory.listRobotClasses();
+            for (Class<? extends RobotTask<Robot>> robotClass : robotClasses) {
+                Color color = colors[colorIndex % colors.length];
+                makeRobot(robotClass, color);
+                colorIndex++;
+            }
+
+            // Load all team leader classes
+            List<Class<? extends RobotTask<TeamLeader>>> leaderClasses = taskFactory.listLeaderClasses();
+            for (Class<? extends RobotTask<TeamLeader>> leaderClass : leaderClasses) {
+                Color color = colors[colorIndex % colors.length];
+                makeTeam(leaderClass, color);
+                colorIndex++;
+            }
+
+            // Update the table to show loaded robots
+            if (robotsTable != null) {
+                SwingUtilities.invokeLater(() -> {
+                    ((RobotsTableModel) robotsTable.getModel()).fireTableDataChanged();
+                });
+            }
+
+            System.out.println("Auto-loaded " + (robotClasses.size() + leaderClasses.size()) + " robot/team types");
+        } catch (Exception e) {
+            System.err.println("Error auto-loading robots: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Find the examples.jar file in common locations.
+     * 
+     * @return the examples.jar file, or null if not found
+     */
+    private java.io.File findExamplesJar()
+    {
+        // Try multiple possible locations relative to project root
+        String[] possiblePaths = {
+            "libs/examples.jar",
+            "app/src/test/resources/examples.jar",
+            "app/build/resources/test/examples.jar",
+            "../libs/examples.jar",
+            "../tasks/build/libs/examples.jar",
+            "tasks/build/libs/examples.jar"
+        };
+
+        // First try relative to current working directory
+        String userDir = System.getProperty("user.dir");
+        for (String path : possiblePaths) {
+            java.io.File file = new java.io.File(userDir, path);
+            if (file.exists() && file.isFile()) {
+                return file.getAbsoluteFile();
+            }
+        }
+
+        // Try absolute paths
+        for (String path : possiblePaths) {
+            java.io.File file = new java.io.File(path);
+            if (file.exists() && file.isFile()) {
+                return file.getAbsoluteFile();
+            }
+        }
+
+        // Try to find it in the classpath (if running from IDE or packaged)
+        try {
+            java.net.URL resource = getClass().getClassLoader().getResource("examples.jar");
+            if (resource != null && "file".equals(resource.getProtocol())) {
+                java.io.File file = new java.io.File(resource.toURI());
+                if (file.exists()) {
+                    return file;
+                }
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+
+        return null;
     }
 }

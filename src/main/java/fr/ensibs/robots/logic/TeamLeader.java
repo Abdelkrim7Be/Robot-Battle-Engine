@@ -24,8 +24,13 @@ public interface TeamLeader extends Robot
     default void broadcastMessage(TeamMessage message)
     {
         for (Droid teammate : getTeammates()) {
-            if (teammate instanceof BaseDroid) {
-                ((BaseDroid) teammate).receiveMessage(message);
+            // Use reflection to call receiveMessage if it exists
+            // This avoids circular dependency with BaseDroid
+            try {
+                java.lang.reflect.Method method = teammate.getClass().getMethod("receiveMessage", TeamMessage.class);
+                method.invoke(teammate, message);
+            } catch (Exception e) {
+                // Silently ignore if method doesn't exist
             }
         }
     }

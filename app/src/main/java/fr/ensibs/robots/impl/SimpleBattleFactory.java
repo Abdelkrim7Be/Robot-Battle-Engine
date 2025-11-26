@@ -60,10 +60,11 @@ public class SimpleBattleFactory implements BattleFactory
     @Override
     public <R extends Droid> DroidView<?> makeRobotView(R robot, String name, Color color)
     {
+        // SAFE MODE: Use simple renderer with no effects
         if (robot instanceof Robot robotImpl) {
-            return new NeonRobotView<>(robotImpl, name, color == null ? Color.CYAN : color);
+            return new SafeModeRobotView<>(robotImpl, name, color == null ? Color.CYAN : color);
         }
-        return new NeonDroidView<>(robot, name, color == null ? Color.ORANGE : color);
+        return new SafeModeDroidView<>(robot, name, color == null ? Color.ORANGE : color);
     }
 }
 

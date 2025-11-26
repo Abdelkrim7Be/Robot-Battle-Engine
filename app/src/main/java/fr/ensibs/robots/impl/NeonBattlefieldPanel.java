@@ -69,11 +69,12 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         
         Graphics2D g2d = (Graphics2D) g;
         
-        // FIX 3: CLEAR SCREEN FIRST - The VERY FIRST thing after super
+        // SAFE MODE: CLEAR SCREEN FIRST - The VERY FIRST thing
         int panelWidth = getWidth();
         int panelHeight = getHeight();
         g2d.setColor(Color.BLACK);
-        g2d.fillRect(0, 0, panelWidth, panelHeight);
+        g2d.clearRect(0, 0, panelWidth, panelHeight); // Clear first
+        g2d.fillRect(0, 0, panelWidth, panelHeight); // Then fill
         
         // Calculate FPS
         long currentTime = System.nanoTime();

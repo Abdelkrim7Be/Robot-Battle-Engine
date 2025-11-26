@@ -1,6 +1,7 @@
 package fr.ensibs.robots;
 
 import fr.ensibs.robots.factories.BattleFactory;
+import fr.ensibs.robots.impl.SimpleBattleFactory;
 import fr.ensibs.robots.logic.Droid;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ public class DroidTest
     @BeforeEach
     void initialize()
     {
-        this.factory = null; // TODO create your own implementation
+        this.factory = new SimpleBattleFactory();
         this.droid = factory.makeDroid();
     }
 

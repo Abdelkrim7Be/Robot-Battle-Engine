@@ -21,8 +21,8 @@ public class Launcher
      */
     public static void main(String[] args)
     {
-        BattleFactory factory = null;        // TODO create your own implementation
-        RobotTaskFactory taskFactory = null; // TODO create your own implementation
+        BattleFactory factory = new fr.ensibs.robots.impl.SimpleBattleFactory();
+        RobotTaskFactory taskFactory = new fr.ensibs.robots.impl.RobotTaskFactoryImpl();
 
         SwingUtilities.invokeLater(() -> {
             // create the frame and display it

@@ -1,6 +1,7 @@
 package fr.ensibs.robots;
 
 import fr.ensibs.robots.factories.RobotTaskFactory;
+import fr.ensibs.robots.impl.RobotTaskFactoryImpl;
 import fr.ensibs.robots.logic.Robot;
 import fr.ensibs.robots.logic.RobotTask;
 import fr.ensibs.robots.logic.TeamLeader;
@@ -34,7 +35,7 @@ public class RobotTaskFactoryTest
     @BeforeEach
     void initialize()
     {
-        this.factory = null; // TODO create your own implementation
+        this.factory = new RobotTaskFactoryImpl();
         // create a temporary jar file
         try (InputStream in = RobotTaskFactoryTest.class.getResourceAsStream("/examples.jar")) {
             Path path = Files.createTempFile("test", ".jar");

@@ -174,28 +174,30 @@ public class ControlsPanel extends JPanel implements ActionListener
         robotsTable.setCellSelectionEnabled(false);
         robotsTable.setDefaultRenderer(String.class, new RobotCellRenderer(views));
         
-        // FIX: Dark table styling - NO WHITE
+        // FIX 2: TOTAL BLACKOUT - Entire hierarchy must be dark
+        // Table
         robotsTable.setBackground(new Color(30, 30, 30)); // Charcoal
-        robotsTable.setForeground(Color.WHITE); // White text
+        robotsTable.setForeground(Color.GREEN); // Green text
         robotsTable.setFont(new Font("Monospaced", Font.PLAIN, 11));
         robotsTable.setGridColor(new Color(51, 51, 51)); // #333333
         robotsTable.setSelectionBackground(new Color(51, 51, 51));
-        robotsTable.setSelectionForeground(Color.WHITE);
+        robotsTable.setSelectionForeground(Color.GREEN);
         
-        // Table header styling
+        // Table header - BLACK background, GREEN text
         robotsTable.getTableHeader().setBackground(Color.BLACK);
-        robotsTable.getTableHeader().setForeground(new Color(0, 255, 0)); // Green
+        robotsTable.getTableHeader().setForeground(Color.GREEN);
         robotsTable.getTableHeader().setFont(new Font("Monospaced", Font.BOLD, 11));
         
         TableColumnModel columnModel = robotsTable.getColumnModel();
         columnModel.getColumn(0).setPreferredWidth(150);
         columnModel.getColumn(1).setPreferredWidth(50);
         
-        // insert the table in a scroll pane
+        // ScrollPane - ENTIRE HIERARCHY
         JScrollPane scrollPane = new JScrollPane(robotsTable);
         scrollPane.setPreferredSize(new Dimension(200, 500));
-        scrollPane.setBackground(new Color(30, 30, 30)); // Charcoal
-        scrollPane.getViewport().setBackground(new Color(30, 30, 30)); // CRITICAL: Viewport must be dark
+        scrollPane.setBackground(new Color(30, 30, 30)); // Container
+        scrollPane.getViewport().setBackground(new Color(30, 30, 30)); // CRITICAL: Viewport
+        scrollPane.getViewport().setOpaque(true); // Ensure viewport is opaque
         scrollPane.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(new Color(51, 51, 51), 1),
             "UNIT_STATUS",
@@ -279,13 +281,13 @@ public class ControlsPanel extends JPanel implements ActionListener
         {
             setText((String) value);
 
-            // FIX: Dark cell styling - Charcoal background, White text
+            // FIX 2: TOTAL BLACKOUT - Charcoal background, GREEN text
             if (isSelected) {
                 setBackground(new Color(51, 51, 51)); // Dark gray when selected
             } else {
                 setBackground(new Color(30, 30, 30)); // Charcoal
             }
-            setForeground(Color.WHITE); // White text (or LIGHT_GRAY)
+            setForeground(Color.GREEN); // GREEN text (terminal style)
             setFont(new Font("Monospaced", Font.PLAIN, 11));
 
             // define the text alignment (left for names and center for energy values)

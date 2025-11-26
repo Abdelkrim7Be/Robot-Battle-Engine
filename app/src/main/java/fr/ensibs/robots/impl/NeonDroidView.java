@@ -61,50 +61,39 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
         int width = radius * 2;
         int height = (int) (radius * 1.8);
         
-        // Team color with neon effect
+        // CRITICAL FIX: Use high-contrast colors for visibility
+        // Body: Dark gray fill with CYAN outline (high visibility on dark background)
         Color teamColor = getColor();
         if (getRobot().getEnergy() <= 0) {
             teamColor = new Color(50, 50, 50); // Dark gray when dead
         }
         
-        // Outer glow
-        g2d.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), 
-                              teamColor.getBlue(), 100));
-        g2d.fill(new RoundRectangle2D.Double(
-            -width / 2.0 - GLOW_RADIUS, -height / 2.0 - GLOW_RADIUS,
-            width + GLOW_RADIUS * 2, height + GLOW_RADIUS * 2,
-            radius * 0.4, radius * 0.4));
-        
-        // Main body
+        // Main body - DARK GRAY fill (visible on dark background)
         RoundRectangle2D body = new RoundRectangle2D.Double(
             -width / 2.0, -height / 2.0, width, height,
             radius * 0.4, radius * 0.4);
         
-        g2d.setColor(teamColor);
+        // Fill with dark gray (high contrast)
+        g2d.setColor(Color.DARK_GRAY);
         g2d.fill(body);
         
-        // Bright border (neon effect)
-        g2d.setColor(new Color(
-            Math.min(255, teamColor.getRed() + 50),
-            Math.min(255, teamColor.getGreen() + 50),
-            Math.min(255, teamColor.getBlue() + 50)
-        ));
+        // Outline with CYAN (high visibility)
+        g2d.setColor(Color.CYAN);
         g2d.setStroke(new BasicStroke(2.0f));
         g2d.draw(body);
         
-        // Draw treads (side details)
-        g2d.setColor(new Color(teamColor.getRed() / 2, teamColor.getGreen() / 2, 
-                              teamColor.getBlue() / 2));
+        // Draw treads (side details) - lighter gray
+        g2d.setColor(new Color(100, 100, 100));
         g2d.setStroke(new BasicStroke(1.5f));
         // Left tread
         g2d.drawLine(-width / 2, -height / 4, -width / 2, height / 4);
         // Right tread
         g2d.drawLine(width / 2, -height / 4, width / 2, height / 4);
         
-        // Front indicator (direction arrow)
+        // Front indicator (direction arrow) - CYAN for visibility
         int[] xPoints = {radius, 0, -radius};
         int[] yPoints = {-height / 2 - 3, -height / 2 - 8, -height / 2 - 3};
-        g2d.setColor(Color.WHITE);
+        g2d.setColor(Color.CYAN);
         g2d.fillPolygon(xPoints, yPoints, 3);
     }
     
@@ -129,6 +118,7 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
     
     /**
      * Draw turret barrel with heat-based color.
+     * CRITICAL: Use lighter gray for visibility on dark background.
      */
     private void drawTurret(Graphics2D g2d)
     {
@@ -136,7 +126,7 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
         double gunLength = radius * 3.0;
         double gunWidth = radius * 0.5;
         
-        // Heat-based color: cool = dark gray, hot = red-orange
+        // Heat-based color: cool = light gray, hot = red-orange
         int gunHeat = getRobot().getGunHeat();
         int maxHeat = 50; // BattleSetup.MAX_GUN_HEAT
         float heatRatio = Math.min(1.0f, gunHeat / (float) maxHeat);
@@ -149,8 +139,8 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
             int blue = 0;
             gunColor = new Color(red, green, blue);
         } else {
-            // Cool: dark gray to light gray
-            int gray = 80 + (int) (100 * heatRatio);
+            // Cool: LIGHT gray (was dark gray - too hard to see)
+            int gray = 150 + (int) (50 * heatRatio);
             gunColor = new Color(gray, gray, gray);
         }
         
@@ -189,7 +179,8 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
     }
     
     /**
-     * Draw neon energy bar above robot.
+     * Draw health bar above robot (tiny horizontal line as specified).
+     * Green if > 50%, Red if < 20%.
      */
     private void drawNeonEnergyBar(Graphics2D g2d, Location location)
     {
@@ -202,45 +193,24 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
         int barX = location.getX() - ENERGY_BAR_WIDTH / 2;
         int barY = location.getY() - BattleSetup.ROBOT_RADIUS - ENERGY_BAR_HEIGHT - 4;
         
-        // Background (dark)
-        g2d.setColor(new Color(30, 30, 30));
-        g2d.fillRect(barX - 1, barY - 1, ENERGY_BAR_WIDTH + 2, ENERGY_BAR_HEIGHT + 2);
-        
-        // Energy fill with neon color gradient
+        // Tiny horizontal line (as specified)
         int fillWidth = (int) (ENERGY_BAR_WIDTH * energyRatio);
         if (fillWidth > 0) {
+            // Color: Green if > 50%, Red if < 20%, Yellow otherwise
             Color energyColor;
-            if (energyRatio > 0.6) {
-                energyColor = new Color(0, 255, 100); // Bright green
-            } else if (energyRatio > 0.3) {
-                energyColor = new Color(255, 200, 0); // Yellow
+            if (energyRatio > 0.5) {
+                energyColor = Color.GREEN; // Green if > 50%
+            } else if (energyRatio < 0.2) {
+                energyColor = Color.RED; // Red if < 20%
             } else {
-                energyColor = new Color(255, 50, 50); // Red
+                energyColor = Color.YELLOW; // Yellow otherwise
             }
             
-            // Glow effect
-            g2d.setColor(new Color(energyColor.getRed(), energyColor.getGreen(), 
-                                  energyColor.getBlue(), 100));
-            g2d.fillRect(barX, barY - 1, fillWidth, ENERGY_BAR_HEIGHT + 2);
-            
-            // Main bar
+            // Draw tiny horizontal line
             g2d.setColor(energyColor);
-            g2d.fillRect(barX, barY, fillWidth, ENERGY_BAR_HEIGHT);
-            
-            // Bright border
-            g2d.setColor(new Color(
-                Math.min(255, energyColor.getRed() + 50),
-                Math.min(255, energyColor.getGreen() + 50),
-                Math.min(255, energyColor.getBlue() + 50)
-            ));
-            g2d.setStroke(new BasicStroke(1.0f));
-            g2d.drawRect(barX, barY, fillWidth, ENERGY_BAR_HEIGHT);
+            g2d.setStroke(new BasicStroke(2.0f));
+            g2d.drawLine(barX, barY, barX + fillWidth, barY);
         }
-        
-        // Border
-        g2d.setColor(new Color(100, 100, 100));
-        g2d.setStroke(new BasicStroke(1.0f));
-        g2d.drawRect(barX - 1, barY - 1, ENERGY_BAR_WIDTH + 2, ENERGY_BAR_HEIGHT + 2);
     }
 }
 

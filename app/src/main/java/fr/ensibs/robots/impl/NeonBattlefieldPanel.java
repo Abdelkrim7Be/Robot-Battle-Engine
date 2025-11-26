@@ -28,11 +28,11 @@ import static fr.ensibs.robots.logic.BattleSetup.FIELD_WIDTH;
  */
 public class NeonBattlefieldPanel extends BattlefieldPanel
 {
-    // Dark theme colors
-    private static final Color BACKGROUND_DARK = new Color(15, 15, 25); // Very dark blue-gray
-    private static final Color GRID_NEON = new Color(0, 150, 150, 60); // Cyan grid (subtle)
-    private static final Color BORDER_NEON = new Color(255, 50, 50, 200); // Red danger zone
-    private static final Color BORDER_GLOW = new Color(255, 100, 100, 100); // Red glow
+    // Dark sci-fi theme colors
+    private static final Color BACKGROUND_DARK = new Color(13, 13, 13); // #0D0D0D Near Black
+    private static final Color GRID_NEON = new Color(0, 50, 0, 80); // Dark green radar grid
+    private static final Color BORDER_NEON = new Color(51, 51, 51); // #333333 Dark gray border
+    private static final Color BORDER_GLOW = new Color(0, 100, 0, 50); // Subtle green glow
     
     private static final int GRID_SIZE = 50;
     
@@ -64,6 +64,9 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     @Override
     protected void paintComponent(Graphics g)
     {
+        // CRITICAL: Call super FIRST to clear and set up rendering context
+        super.paintComponent(g);
+        
         // Calculate FPS
         long currentTime = System.nanoTime();
         long deltaTime = currentTime - lastFrameTime;
@@ -79,10 +82,6 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         
-        // Fill with dark background
-        g2d.setColor(BACKGROUND_DARK);
-        g2d.fillRect(0, 0, getWidth(), getHeight());
-        
         // Compute scale and margins
         int panelWidth = getWidth();
         int panelHeight = getHeight();
@@ -93,26 +92,27 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(new AffineTransform(scale, 0, 0, scale, marginX, marginY));
         
-        // Draw dark background for battlefield
+        // STRICT RENDERING ORDER:
+        // 1. Background (dark)
         g2d.setColor(BACKGROUND_DARK);
         g2d.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
         
-        // Draw digital grid
+        // 2. Grid (radar-style dark green)
         drawDigitalGrid(g2d);
         
-        // Draw glowing danger zone borders
+        // 3. Borders
         drawDangerZoneBorders(g2d);
         
-        // Draw bullets and trails
-        drawAdditionalEntities(g2d);
-        
-        // Draw robots (with damage flash overlay)
+        // 4. Robots (BEFORE bullets so they're visible)
         drawRobots(g2d);
         
-        // Draw muzzle flashes
+        // 5. Bullets and trails
+        drawAdditionalEntities(g2d);
+        
+        // 6. Muzzle flashes
         muzzleFlashSystem.draw(g2d);
         
-        // Draw particle effects
+        // 7. Particle effects
         particleSystem.draw(g2d);
         
         // Restore transform for screen-space drawing
@@ -123,7 +123,7 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     }
     
     /**
-     * Draw the digital grid overlay.
+     * Draw the digital grid overlay (radar-style dark green).
      */
     private void drawDigitalGrid(Graphics2D g2d)
     {
@@ -142,15 +142,10 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     }
     
     /**
-     * Draw glowing danger zone borders.
+     * Draw danger zone borders (dark gray).
      */
     private void drawDangerZoneBorders(Graphics2D g2d)
     {
-        // Outer glow
-        g2d.setColor(BORDER_GLOW);
-        g2d.setStroke(new BasicStroke(4.0f));
-        g2d.drawRect(-2, -2, FIELD_WIDTH + 4, FIELD_HEIGHT + 4);
-        
         // Main border
         g2d.setColor(BORDER_NEON);
         g2d.setStroke(new BasicStroke(2.0f));
@@ -159,10 +154,17 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     /**
      * Draw robots with damage flash overlay.
+     * CRITICAL: Ensure robots are visible with high contrast colors.
      */
     private void drawRobots(Graphics2D g2d)
     {
         List<DroidView<? extends Droid>> views = getViews();
+        
+        // DEBUG: Draw test robot at center if no robots loaded
+        if (views.isEmpty()) {
+            drawTestRobot(g2d, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+        }
+        
         for (DroidView<? extends Droid> view : views) {
             if (view.getRobot().getEnergy() > 0) {
                 view.draw(g2d);
@@ -170,6 +172,24 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 damageFlashSystem.drawFlash(g2d, view);
             }
         }
+    }
+    
+    /**
+     * Draw a test robot at specified coordinates to verify rendering pipeline.
+     */
+    private void drawTestRobot(Graphics2D g2d, int x, int y)
+    {
+        AffineTransform original = g2d.getTransform();
+        g2d.translate(x, y);
+        
+        // Draw bright red test robot (high visibility)
+        g2d.setColor(Color.RED);
+        g2d.fillOval(-10, -10, 20, 20);
+        g2d.setColor(Color.WHITE);
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.drawOval(-10, -10, 20, 20);
+        
+        g2d.setTransform(original);
     }
     
     /**

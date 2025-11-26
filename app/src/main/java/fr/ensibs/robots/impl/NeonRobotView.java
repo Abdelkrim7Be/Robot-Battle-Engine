@@ -95,7 +95,7 @@ class NeonRobotView<R extends Robot> extends RobotView<R>
     }
     
     /**
-     * Draw radar field of vision as a semi-transparent cone.
+     * Draw radar field of vision as a semi-transparent cone (green as specified).
      */
     private void drawRadarField(Graphics2D g2D, Location location, double heading, double halfField)
     {
@@ -109,9 +109,9 @@ class NeonRobotView<R extends Robot> extends RobotView<R>
         // Save composite
         Composite original = g2D.getComposite();
         
-        // Draw semi-transparent cone
-        g2D.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, RADAR_FIELD_ALPHA));
-        g2D.setColor(new Color(0, 255, 255)); // Cyan
+        // Draw semi-transparent cone (green as specified: new Color(0, 255, 0, 50))
+        g2D.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.2f)); // 50/255 ≈ 0.2
+        g2D.setColor(new Color(0, 255, 0, 50)); // Green with 50 alpha
         
         // Draw arc (pie slice)
         Arc2D arc = new Arc2D.Double(arcX, arcY, diameter, diameter,
@@ -120,8 +120,8 @@ class NeonRobotView<R extends Robot> extends RobotView<R>
         
         // Draw border
         g2D.setComposite(original);
-        g2D.setColor(new Color(0, 200, 200, 150));
-        g2D.setStroke(new BasicStroke(2.0f));
+        g2D.setColor(new Color(0, 150, 0, 100)); // Darker green border
+        g2D.setStroke(new BasicStroke(1.5f));
         g2D.draw(arc);
     }
 }

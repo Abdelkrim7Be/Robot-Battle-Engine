@@ -26,56 +26,60 @@ public class BattleDashboard extends JPanel
     public BattleDashboard()
     {
         setLayout(new BorderLayout(5, 5));
-        setBackground(new Color(20, 20, 30));
-        setForeground(Color.WHITE);
+        setBackground(new Color(26, 26, 26)); // #1A1A1A Dark Grey
+        setForeground(new Color(0, 255, 0)); // Terminal Green
+        setBorder(BorderFactory.createLineBorder(new Color(51, 51, 51), 1)); // #333333 border
         
         // Leaderboard
         leaderboardModel = new DefaultListModel<>();
         leaderboardList = new JList<>(leaderboardModel);
-        leaderboardList.setBackground(new Color(25, 25, 35));
-        leaderboardList.setForeground(Color.WHITE);
+        leaderboardList.setBackground(new Color(13, 13, 13)); // #0D0D0D Near Black
+        leaderboardList.setForeground(new Color(0, 255, 0)); // Terminal Green
         leaderboardList.setFont(new Font("Monospaced", Font.BOLD, 12));
-        leaderboardList.setSelectionBackground(new Color(0, 150, 255));
+        leaderboardList.setSelectionBackground(new Color(0, 100, 0)); // Dark green selection
         
         JScrollPane leaderboardScroll = new JScrollPane(leaderboardList);
         leaderboardScroll.setBorder(new TitledBorder(
-            BorderFactory.createLineBorder(new Color(0, 150, 255), 2),
-            "LEADERBOARD",
+            BorderFactory.createLineBorder(new Color(51, 51, 51), 1), // #333333
+            "BATTLE_LOG // LEADERBOARD",
             TitledBorder.LEFT,
             TitledBorder.TOP,
             new Font("Monospaced", Font.BOLD, 14),
-            new Color(0, 200, 255)));
-        leaderboardScroll.setBackground(new Color(20, 20, 30));
+            new Color(0, 255, 0))); // Terminal Green
+        leaderboardScroll.setBackground(new Color(26, 26, 26));
+        leaderboardScroll.getViewport().setBackground(new Color(13, 13, 13));
         
         // Kill feed
         killFeed = new JTextArea(8, 20);
         killFeed.setEditable(false);
-        killFeed.setBackground(new Color(25, 25, 35));
-        killFeed.setForeground(new Color(255, 100, 100));
+        killFeed.setBackground(new Color(13, 13, 13)); // #0D0D0D Near Black
+        killFeed.setForeground(new Color(0, 255, 0)); // Terminal Green
         killFeed.setFont(new Font("Monospaced", Font.PLAIN, 11));
         killFeed.setLineWrap(true);
         killFeed.setWrapStyleWord(true);
         
         JScrollPane killFeedScroll = new JScrollPane(killFeed);
         killFeedScroll.setBorder(new TitledBorder(
-            BorderFactory.createLineBorder(new Color(255, 50, 50), 2),
-            "KILL FEED",
+            BorderFactory.createLineBorder(new Color(51, 51, 51), 1), // #333333
+            "KILL_FEED // LIVE",
             TitledBorder.LEFT,
             TitledBorder.TOP,
             new Font("Monospaced", Font.BOLD, 14),
-            new Color(255, 100, 100)));
-        killFeedScroll.setBackground(new Color(20, 20, 30));
+            new Color(0, 255, 0))); // Terminal Green
+        killFeedScroll.setBackground(new Color(26, 26, 26));
+        killFeedScroll.getViewport().setBackground(new Color(13, 13, 13));
         
         // Status panel
         JPanel statusPanel = new JPanel(new GridLayout(2, 1, 5, 5));
-        statusPanel.setBackground(new Color(20, 20, 30));
+        statusPanel.setBackground(new Color(26, 26, 26)); // #1A1A1A
+        statusPanel.setBorder(BorderFactory.createLineBorder(new Color(51, 51, 51), 1));
         
-        statusLabel = new JLabel("Round Time: 0:00");
-        statusLabel.setForeground(new Color(0, 255, 150));
+        statusLabel = new JLabel("ROUND_TIME: 0:00");
+        statusLabel.setForeground(new Color(0, 255, 0)); // Terminal Green
         statusLabel.setFont(new Font("Monospaced", Font.BOLD, 12));
         
-        robotsAliveLabel = new JLabel("Robots Alive: 0/0");
-        robotsAliveLabel.setForeground(new Color(255, 200, 0));
+        robotsAliveLabel = new JLabel("UNITS_ALIVE: 0/0");
+        robotsAliveLabel.setForeground(new Color(0, 255, 0)); // Terminal Green
         robotsAliveLabel.setFont(new Font("Monospaced", Font.BOLD, 12));
         
         statusPanel.add(statusLabel);
@@ -115,7 +119,13 @@ public class BattleDashboard extends JPanel
         int rank = 1;
         for (DroidView<? extends Droid> view : alive) {
             Droid droid = view.getRobot();
-            String entry = String.format("#%d %s [%d]", rank++, view.getName(), droid.getEnergy());
+            int maxEnergy = droid instanceof fr.ensibs.robots.logic.Robot 
+                ? fr.ensibs.robots.logic.BattleSetup.ROBOT_INITIAL_ENERGY 
+                : fr.ensibs.robots.logic.BattleSetup.DROID_INITIAL_ENERGY;
+            double energyPercent = (droid.getEnergy() / (double) maxEnergy) * 100;
+            int bars = (int) (energyPercent / 20); // 5 bars max
+            String barStr = "|".repeat(bars) + " ".repeat(5 - bars);
+            String entry = String.format("UNIT_%02d: [%s] %3.0f%% ENRG", rank++, barStr, energyPercent);
             leaderboardModel.addElement(entry);
         }
     }
@@ -134,10 +144,10 @@ public class BattleDashboard extends JPanel
         long elapsed = (currentTime - roundStartTime) / 1000;
         long minutes = elapsed / 60;
         long seconds = elapsed % 60;
-        statusLabel.setText(String.format("Round Time: %d:%02d", minutes, seconds));
+        statusLabel.setText(String.format("ROUND_TIME: %d:%02d", minutes, seconds));
         
         int alive = (int) views.stream().filter(v -> v.getRobot().getEnergy() > 0).count();
-        robotsAliveLabel.setText(String.format("Robots Alive: %d/%d", alive, initialRobotCount));
+        robotsAliveLabel.setText(String.format("UNITS_ALIVE: %d/%d", alive, initialRobotCount));
     }
     
     /**

@@ -36,13 +36,16 @@ public class EnhancedBattlefieldFrame extends JFrame
      */
     public EnhancedBattlefieldFrame(BattleFactory factory, RobotTaskFactory taskFactory)
     {
-        super("Robot Wars - Battle Royale | Operation Neon Battlefield");
+        super("BATTLEFIELD_TERMINAL // LIVE");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
+        // Global dark sci-fi theme
+        getContentPane().setBackground(new Color(26, 26, 26)); // #1A1A1A
         
         JPanel mainPanel = new JPanel(new BorderLayout(5, 5));
         setContentPane(mainPanel);
         mainPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
-        mainPanel.setBackground(new Color(15, 15, 25));
+        mainPanel.setBackground(new Color(26, 26, 26)); // #1A1A1A Dark Grey
 
         // shared list of robots views and battlefield
         List<DroidView<? extends Droid>> views = new ArrayList<>();

@@ -173,19 +173,29 @@ public class ControlsPanel extends JPanel implements ActionListener
         robotsTable.setRowSelectionAllowed(false);
         robotsTable.setCellSelectionEnabled(false);
         robotsTable.setDefaultRenderer(String.class, new RobotCellRenderer(views));
-        // Dark sci-fi table styling
-        robotsTable.setBackground(new Color(13, 13, 13)); // #0D0D0D
-        robotsTable.setForeground(new Color(0, 255, 0)); // Terminal Green
+        
+        // FIX: Dark table styling - NO WHITE
+        robotsTable.setBackground(new Color(30, 30, 30)); // Charcoal
+        robotsTable.setForeground(Color.WHITE); // White text
         robotsTable.setFont(new Font("Monospaced", Font.PLAIN, 11));
         robotsTable.setGridColor(new Color(51, 51, 51)); // #333333
+        robotsTable.setSelectionBackground(new Color(51, 51, 51));
+        robotsTable.setSelectionForeground(Color.WHITE);
+        
+        // Table header styling
+        robotsTable.getTableHeader().setBackground(Color.BLACK);
+        robotsTable.getTableHeader().setForeground(new Color(0, 255, 0)); // Green
+        robotsTable.getTableHeader().setFont(new Font("Monospaced", Font.BOLD, 11));
+        
         TableColumnModel columnModel = robotsTable.getColumnModel();
         columnModel.getColumn(0).setPreferredWidth(150);
         columnModel.getColumn(1).setPreferredWidth(50);
+        
         // insert the table in a scroll pane
         JScrollPane scrollPane = new JScrollPane(robotsTable);
         scrollPane.setPreferredSize(new Dimension(200, 500));
-        scrollPane.setBackground(new Color(26, 26, 26));
-        scrollPane.getViewport().setBackground(new Color(13, 13, 13));
+        scrollPane.setBackground(new Color(30, 30, 30)); // Charcoal
+        scrollPane.getViewport().setBackground(new Color(30, 30, 30)); // CRITICAL: Viewport must be dark
         scrollPane.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(new Color(51, 51, 51), 1),
             "UNIT_STATUS",
@@ -269,9 +279,13 @@ public class ControlsPanel extends JPanel implements ActionListener
         {
             setText((String) value);
 
-            // Dark sci-fi cell styling
-            setBackground(new Color(13, 13, 13)); // #0D0D0D
-            setForeground(new Color(0, 255, 0)); // Terminal Green
+            // FIX: Dark cell styling - Charcoal background, White text
+            if (isSelected) {
+                setBackground(new Color(51, 51, 51)); // Dark gray when selected
+            } else {
+                setBackground(new Color(30, 30, 30)); // Charcoal
+            }
+            setForeground(Color.WHITE); // White text (or LIGHT_GRAY)
             setFont(new Font("Monospaced", Font.PLAIN, 11));
 
             // define the text alignment (left for names and center for energy values)

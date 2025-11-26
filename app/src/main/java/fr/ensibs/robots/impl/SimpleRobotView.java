@@ -9,6 +9,9 @@ import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Shape;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Ellipse2D;
 
 /**
  * Enhanced graphical representation for robots with improved radar visualization
@@ -40,20 +43,56 @@ class SimpleRobotView<R extends Robot> extends RobotView<R>
     protected void drawRadar(Graphics2D g2d)
     {
         Location location = getRobot().getLocation();
-        double heading = Math.toRadians(getRobot().getRadarHeading());
+        double radarHeading = getRobot().getRadarHeading();
         double halfField = Math.toRadians(BattleSetup.VISION_FIELD / 2.0);
         
         // Draw radar field of vision arc
-        drawRadarField(g2d, location, heading, halfField);
+        drawRadarField(g2d, location, Math.toRadians(radarHeading), halfField);
         
-        // Draw radar line
-        double dx = Math.sin(heading) * RADAR_LENGTH;
-        double dy = -Math.cos(heading) * RADAR_LENGTH;
-        g2d.setColor(Color.RED);
+        // Save original transform
+        AffineTransform originalTransform = g2d.getTransform();
+        
+        // Translate to robot center
+        g2d.translate(location.getX(), location.getY());
+        
+        // Rotate around center based on RADAR heading (independent of gun and body)
+        g2d.rotate(Math.toRadians(radarHeading));
+        
+        // Draw radar dish
+        drawRadarDish(g2d);
+        
+        // Restore transform
+        g2d.setTransform(originalTransform);
+    }
+    
+    /**
+     * Draw the radar dish as a distinct shape.
+     * This is drawn with the radar's rotation applied via AffineTransform,
+     * which is independent of both gun and body rotations.
+     */
+    private void drawRadarDish(Graphics2D g2d)
+    {
+        int radius = BattleSetup.ROBOT_RADIUS;
+        double dishRadius = radius * 0.8;
+        double dishLength = RADAR_LENGTH;
+        
+        // Draw radar dish (semi-circle/arc shape)
+        Shape radarDish = new Ellipse2D.Double(
+            -dishRadius / 2.0, -dishLength, dishRadius, dishRadius);
+        
+        // Radar color (cyan/blue for visibility)
+        g2d.setColor(new Color(0, 150, 255, 180)); // Semi-transparent cyan
+        g2d.fill(radarDish);
+        
+        // Draw border
+        g2d.setColor(new Color(0, 100, 200));
         g2d.setStroke(new BasicStroke(1.5f));
-        g2d.drawLine(location.getX(), location.getY(), 
-                     (int) Math.round(location.getX() + dx), 
-                     (int) Math.round(location.getY() + dy));
+        g2d.draw(radarDish);
+        
+        // Draw radar beam line
+        g2d.setColor(new Color(255, 200, 0, 200)); // Yellow-orange beam
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.drawLine(0, 0, 0, (int) -dishLength);
     }
 
     /**

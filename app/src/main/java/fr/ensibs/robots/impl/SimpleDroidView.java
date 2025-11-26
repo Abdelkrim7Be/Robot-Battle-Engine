@@ -8,6 +8,9 @@ import fr.ensibs.robots.view.DroidView;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Shape;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.RoundRectangle2D;
 
 /**
  * Enhanced graphical representation for a droid with energy bar and direction indicator.
@@ -29,49 +32,116 @@ class SimpleDroidView<R extends Droid> extends DroidView<R>
     protected void drawBody(Graphics2D g2d)
     {
         Location location = getRobot().getLocation();
-        int diameter = BattleSetup.ROBOT_RADIUS * 2;
-        int topLeftX = location.getX() - BattleSetup.ROBOT_RADIUS;
-        int topLeftY = location.getY() - BattleSetup.ROBOT_RADIUS;
         
         // Draw energy bar above the robot
         drawEnergyBar(g2d, location);
         
-        // Draw robot body with gradient effect
+        // Save original transform
+        AffineTransform originalTransform = g2d.getTransform();
+        
+        // Translate to robot center
+        g2d.translate(location.getX(), location.getY());
+        
+        // Rotate around center based on body heading
+        double bodyHeading = getRobot().getHeading();
+        g2d.rotate(Math.toRadians(bodyHeading));
+        
+        // Draw tank base (rectangular body shape)
+        drawTankBase(g2d);
+        
+        // Restore transform
+        g2d.setTransform(originalTransform);
+    }
+    
+    /**
+     * Draw the tank base (body) as a distinct rectangular shape.
+     * This is drawn with the body's rotation applied via AffineTransform.
+     */
+    private void drawTankBase(Graphics2D g2d)
+    {
+        int radius = BattleSetup.ROBOT_RADIUS;
+        int width = radius * 2;
+        int height = (int) (radius * 1.6); // Slightly flattened
+        
+        // Body color (team color)
         Color bodyColor = getColor();
         if (getRobot().getEnergy() <= 0) {
             bodyColor = Color.GRAY;
         }
+        
+        // Draw tank base as rounded rectangle
+        Shape tankBase = new RoundRectangle2D.Double(
+            -width / 2.0, -height / 2.0, width, height, radius * 0.3, radius * 0.3);
+        
         g2d.setColor(bodyColor);
-        g2d.fillOval(topLeftX, topLeftY, diameter, diameter);
+        g2d.fill(tankBase);
         
         // Draw border
         g2d.setColor(Color.BLACK);
-        g2d.setStroke(new BasicStroke(1));
-        g2d.drawOval(topLeftX, topLeftY, diameter, diameter);
+        g2d.setStroke(new BasicStroke(1.5f));
+        g2d.draw(tankBase);
         
-        // Draw direction indicator (small line showing body heading)
-        drawDirectionIndicator(g2d, location);
+        // Draw front indicator (small triangle pointing forward)
+        int[] xPoints = {radius, 0, -radius};
+        int[] yPoints = {-height / 2 - 2, -height / 2 - 6, -height / 2 - 2};
+        g2d.setColor(Color.WHITE);
+        g2d.fillPolygon(xPoints, yPoints, 3);
+        g2d.setColor(Color.BLACK);
+        g2d.drawPolygon(xPoints, yPoints, 3);
     }
 
     @Override
     protected void drawGun(Graphics2D g2d)
     {
         Location location = getRobot().getLocation();
-        double heading = Math.toRadians(getRobot().getGunHeading());
-        double gunLength = BattleSetup.ROBOT_RADIUS * 2.5;
-        double dx = Math.sin(heading) * gunLength;
-        double dy = -Math.cos(heading) * gunLength;
         
-        // Draw gun with different color if overheated
-        if (getRobot().getGunHeat() > 1) {
-            g2d.setColor(Color.RED);
-        } else {
-            g2d.setColor(Color.DARK_GRAY);
-        }
-        g2d.setStroke(new BasicStroke(2.5f));
-        g2d.drawLine(location.getX(), location.getY(), 
-                     (int) Math.round(location.getX() + dx), 
-                     (int) Math.round(location.getY() + dy));
+        // Save original transform
+        AffineTransform originalTransform = g2d.getTransform();
+        
+        // Translate to robot center
+        g2d.translate(location.getX(), location.getY());
+        
+        // Rotate around center based on GUN heading (independent of body)
+        double gunHeading = getRobot().getGunHeading();
+        g2d.rotate(Math.toRadians(gunHeading));
+        
+        // Draw turret (gun barrel)
+        drawTurret(g2d);
+        
+        // Restore transform
+        g2d.setTransform(originalTransform);
+    }
+    
+    /**
+     * Draw the turret (gun) as a distinct shape.
+     * This is drawn with the gun's rotation applied via AffineTransform,
+     * which is independent of the body rotation.
+     */
+    private void drawTurret(Graphics2D g2d)
+    {
+        int radius = BattleSetup.ROBOT_RADIUS;
+        double gunLength = radius * 2.5;
+        double gunWidth = radius * 0.4;
+        
+        // Gun color - red if overheated, dark gray otherwise
+        Color gunColor = getRobot().getGunHeat() > 1 ? Color.RED : Color.DARK_GRAY;
+        
+        // Draw turret barrel as a rounded rectangle
+        Shape turret = new RoundRectangle2D.Double(
+            -gunWidth / 2.0, -gunLength / 2.0, gunWidth, gunLength, gunWidth * 0.5, gunWidth * 0.5);
+        
+        g2d.setColor(gunColor);
+        g2d.fill(turret);
+        
+        // Draw border
+        g2d.setColor(Color.BLACK);
+        g2d.setStroke(new BasicStroke(1.0f));
+        g2d.draw(turret);
+        
+        // Draw gun tip (muzzle)
+        int tipSize = (int) (radius * 0.3);
+        g2d.setColor(Color.ORANGE);
+        g2d.fillOval(-tipSize / 2, (int) (-gunLength / 2 - tipSize / 2), tipSize, tipSize);
     }
 
     /**
@@ -108,22 +178,6 @@ class SimpleDroidView<R extends Droid> extends DroidView<R>
         g2d.drawRect(barX, barY, ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT);
     }
 
-    /**
-     * Draws a small line indicating the body's heading direction.
-     */
-    private void drawDirectionIndicator(Graphics2D g2d, Location location)
-    {
-        double heading = Math.toRadians(getRobot().getHeading());
-        double indicatorLength = BattleSetup.ROBOT_RADIUS * 0.6;
-        double dx = Math.sin(heading) * indicatorLength;
-        double dy = -Math.cos(heading) * indicatorLength;
-        
-        g2d.setColor(Color.WHITE);
-        g2d.setStroke(new BasicStroke(1.5f));
-        g2d.drawLine(location.getX(), location.getY(),
-                     (int) Math.round(location.getX() + dx),
-                     (int) Math.round(location.getY() + dy));
-    }
 }
 
 

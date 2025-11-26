@@ -1,10 +1,7 @@
 package fr.ensibs.robots;
 
-import fr.ensibs.robots.factories.BattleFactory;
 import fr.ensibs.robots.impl.EnhancedBattlefieldPanel;
-import fr.ensibs.robots.impl.SimpleBattleFactory;
 import fr.ensibs.robots.logic.Droid;
-import fr.ensibs.robots.view.BattlefieldFrame;
 import fr.ensibs.robots.view.DroidView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,12 +28,10 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ViewTest
 {
-    private BattleFactory factory;
-
     @BeforeEach
     void initialize()
     {
-        this.factory = new SimpleBattleFactory();
+        // Test setup if needed
     }
 
     /**

@@ -5,7 +5,6 @@ import fr.ensibs.robots.view.BattlefieldPanel;
 import fr.ensibs.robots.view.DroidView;
 // import fr.ensibs.robots.view.IDrawable; // TODO: Uncomment when api module is built
 
-import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.util.ArrayList;

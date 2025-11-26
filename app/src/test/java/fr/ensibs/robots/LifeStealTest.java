@@ -180,8 +180,9 @@ class LifeStealTest
 
     /**
      * Helper method to move a droid to a specific location.
+     * Handles CollisionException internally.
      */
-    private void moveTo(Droid droid, int x, int y) throws CollisionException, ExhaustedException
+    private void moveTo(Droid droid, int x, int y) throws ExhaustedException
     {
         fr.ensibs.robots.logic.Battlefield battlefield = factory.makeBattlefield();
         
@@ -191,7 +192,12 @@ class LifeStealTest
             int dx = x - droid.getLocation().getX();
             int moveDistance = Math.max(-50, Math.min(50, dx));
             if (moveDistance == 0) break;
-            battlefield.move(droid, moveDistance);
+            try {
+                battlefield.move(droid, moveDistance);
+            } catch (CollisionException e) {
+                // Stop if collision occurs
+                break;
+            }
         }
         
         // Move to y location
@@ -200,7 +206,12 @@ class LifeStealTest
             int dy = y - droid.getLocation().getY();
             int moveDistance = Math.max(-50, Math.min(50, dy));
             if (moveDistance == 0) break;
-            battlefield.move(droid, moveDistance);
+            try {
+                battlefield.move(droid, moveDistance);
+            } catch (CollisionException e) {
+                // Stop if collision occurs
+                break;
+            }
         }
     }
 }

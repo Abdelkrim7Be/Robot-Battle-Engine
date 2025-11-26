@@ -197,7 +197,27 @@ class BattlefieldImpl implements Battlefield
     }
     
     /**
-     * Update all bullets by one game tick.
+     * Detect and handle all collisions in the battlefield.
+     * This includes:
+     * <ul>
+     *   <li>Bullet vs Robot collisions</li>
+     *   <li>Robot vs Wall collisions (handled during movement)</li>
+     *   <li>Robot vs Robot collisions (handled during movement)</li>
+     * </ul>
+     * 
+     * <p>This method should be called each game loop iteration.
+     */
+    void detectCollisions()
+    {
+        // Update bullets and detect bullet vs robot collisions
+        updateBullets();
+        
+        // Robot vs wall and robot vs robot collisions are handled
+        // during the move() method, so no additional processing needed here
+    }
+    
+    /**
+     * Update all bullets by one game tick and detect bullet vs robot collisions.
      * This should be called each game loop iteration.
      */
     void updateBullets()
@@ -210,16 +230,16 @@ class BattlefieldImpl implements Battlefield
             if (!stillActive) {
                 return true; // Remove bullets that went out of bounds or exceeded range
             }
-            // Check for collisions with robots
+            // Check for collisions with robots (Bullet vs Robot)
             Location bulletLoc = bullet.getLocation();
             for (BaseDroid robot : robots) {
                 if (robot == bullet.getOwner() || robot.getEnergy() <= 0) {
-                    continue;
+                    continue; // Skip owner and dead robots
                 }
                 double distSq = distanceSquared(bulletLoc, robot.getLocation());
                 double collisionDistSq = BattleSetup.ROBOT_RADIUS * BattleSetup.ROBOT_RADIUS;
                 if (distSq <= collisionDistSq) {
-                    // Bullet hit robot
+                    // Bullet hit robot - apply damage and life steal
                     int damage = calculateDamage(bullet.getPower());
                     robot.adjustEnergy(-damage);
                     bullet.getOwner().adjustEnergy(calculateLifeSteal(bullet.getPower()));
@@ -229,6 +249,31 @@ class BattlefieldImpl implements Battlefield
             }
             return false; // Keep bullet active
         });
+    }
+    
+    /**
+     * Remove all dead robots (energy <= 0) from the battlefield.
+     * This should be called each game loop iteration after collision detection.
+     * 
+     * @return the number of robots removed
+     */
+    int removeDeadRobots()
+    {
+        int sizeBefore = robots.size();
+        robots.removeIf(robot -> robot.getEnergy() <= 0);
+        return sizeBefore - robots.size();
+    }
+    
+    /**
+     * Get the number of active (alive) robots on the battlefield.
+     * 
+     * @return the count of robots with energy > 0
+     */
+    int getActiveRobotCount()
+    {
+        return (int) robots.stream()
+            .filter(robot -> robot.getEnergy() > 0)
+            .count();
     }
 
     /**

@@ -4,12 +4,9 @@ import fr.ensibs.robots.factories.BattleFactory;
 import fr.ensibs.robots.impl.SimpleBattleFactory;
 import fr.ensibs.robots.logic.Droid;
 import fr.ensibs.robots.logic.Robot;
-import fr.ensibs.robots.view.DroidView;
-import fr.ensibs.robots.view.RobotView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 

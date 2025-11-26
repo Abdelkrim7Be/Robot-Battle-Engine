@@ -38,6 +38,13 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
     // private final List<IDrawable> additionalDrawables;
     private final List<Object> additionalDrawables; // Temporary: will be List<IDrawable>
     
+    // HUD and effects components
+    private final HUDOverlay hudOverlay;
+    private final ParticleSystem particleSystem;
+    private final Leaderboard leaderboard;
+    private boolean showHUD = true;
+    private boolean showLeaderboard = true;
+    
     /**
      * Constructor
      * 
@@ -47,6 +54,9 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
     {
         super(views);
         this.additionalDrawables = new ArrayList<>();
+        this.hudOverlay = new HUDOverlay();
+        this.particleSystem = new ParticleSystem();
+        this.leaderboard = new Leaderboard();
         
         // Enable double buffering for smooth rendering
         setDoubleBuffered(true);
@@ -117,8 +127,39 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
         // Draw additional drawable entities (bullets, particles, etc.)
         drawAdditionalEntities(g2d);
         
-        // Restore original transform
+        // Draw particle effects
+        particleSystem.draw(g2d);
+        
+        // Draw HUD overlay (in battlefield coordinates)
+        if (showHUD) {
+            hudOverlay.draw(g2d, getViews());
+        }
+        
+        // Restore original transform for screen-space drawing
         g2d.setTransform(originalTransform);
+        
+        // Draw leaderboard (in screen coordinates)
+        if (showLeaderboard) {
+            int leaderboardX = 10;
+            int leaderboardY = 10;
+            leaderboard.draw(g2d, getViews(), leaderboardX, leaderboardY);
+        }
+    }
+    
+    /**
+     * Get the views list (accessor for HUD/Leaderboard).
+     */
+    @SuppressWarnings("unchecked")
+    private List<DroidView<? extends Droid>> getViews()
+    {
+        // Access views through reflection since it's private in parent
+        try {
+            java.lang.reflect.Field viewsField = BattlefieldPanel.class.getDeclaredField("views");
+            viewsField.setAccessible(true);
+            return (List<DroidView<? extends Droid>>) viewsField.get(this);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
     }
     
     /**
@@ -168,6 +209,67 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
                 // Skip if draw method doesn't exist or fails
             }
         }
+    }
+    
+    /**
+     * Update particle system (should be called each frame).
+     */
+    public void updateParticles()
+    {
+        particleSystem.update();
+    }
+    
+    /**
+     * Create a hit effect at the given location.
+     * 
+     * @param location the location of the hit
+     * @param color the color of the effect
+     */
+    public void createHitEffect(fr.ensibs.robots.logic.Location location, Color color)
+    {
+        particleSystem.createHit(location, color);
+    }
+    
+    /**
+     * Create an explosion effect at the given location.
+     * 
+     * @param location the location of the explosion
+     * @param color the color of the explosion
+     * @param intensity the intensity (number of particles)
+     */
+    public void createExplosion(fr.ensibs.robots.logic.Location location, Color color, int intensity)
+    {
+        particleSystem.createExplosion(location, color, intensity);
+    }
+    
+    /**
+     * Toggle HUD visibility.
+     * 
+     * @param visible true to show HUD, false to hide
+     */
+    public void setHUDVisible(boolean visible)
+    {
+        this.showHUD = visible;
+    }
+    
+    /**
+     * Toggle leaderboard visibility.
+     * 
+     * @param visible true to show leaderboard, false to hide
+     */
+    public void setLeaderboardVisible(boolean visible)
+    {
+        this.showLeaderboard = visible;
+    }
+    
+    /**
+     * Get the particle system (for external updates).
+     * 
+     * @return the particle system
+     */
+    public ParticleSystem getParticleSystem()
+    {
+        return particleSystem;
     }
     
     /**

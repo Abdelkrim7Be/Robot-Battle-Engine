@@ -37,7 +37,7 @@ public class BulletView // implements IDrawable
     }
     
     /**
-     * Draw the bullet on the battlefield.
+     * Draw the bullet on the battlefield with enhanced tracer trail.
      * 
      * @param g2d the graphics context
      */
@@ -51,39 +51,63 @@ public class BulletView // implements IDrawable
         int power = bullet.getPower();
         
         // Bullet size scales with power
-        double size = 2.0 + (power * 0.3);
+        double size = 3.0 + (power * 0.4);
         double radius = size / 2.0;
         
-        // Draw bullet as a bright circle (tracer)
+        double heading = Math.toRadians(bullet.getHeading());
+        double trailLength = 15.0 + (power * 0.5); // Longer trail for higher power
+        
+        // Draw fading trail (multiple segments for smooth fade)
+        for (int i = 3; i >= 0; i--) {
+            double segmentLength = trailLength * (i + 1) / 4.0;
+            double segDx = Math.sin(heading) * segmentLength;
+            double segDy = -Math.cos(heading) * segmentLength;
+            
+            float alpha = 0.3f + (0.7f * i / 3.0f);
+            Color trailColor = new Color(
+                tracerColor.getRed(),
+                tracerColor.getGreen(),
+                tracerColor.getBlue(),
+                (int) (alpha * 200)
+            );
+            
+            g2d.setColor(trailColor);
+            g2d.setStroke(new BasicStroke(2.0f - (i * 0.3f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2d.drawLine(
+                location.getX(),
+                location.getY(),
+                (int) Math.round(location.getX() - segDx),
+                (int) Math.round(location.getY() - segDy)
+            );
+        }
+        
+        // Draw bright core (glowing circle)
         Shape bulletShape = new Ellipse2D.Double(
             location.getX() - radius,
             location.getY() - radius,
             size,
             size);
         
-        // Draw bright core
+        // Outer glow
+        g2d.setColor(new Color(tracerColor.getRed(), tracerColor.getGreen(), 
+                              tracerColor.getBlue(), 100));
+        g2d.fill(new Ellipse2D.Double(
+            location.getX() - radius - 2,
+            location.getY() - radius - 2,
+            size + 4,
+            size + 4));
+        
+        // Bright core
         g2d.setColor(tracerColor);
         g2d.fill(bulletShape);
         
-        // Draw outer glow (lighter)
-        Color glowColor = new Color(tracerColor.getRed(), tracerColor.getGreen(), 
-                                   tracerColor.getBlue(), 100);
-        g2d.setColor(glowColor);
-        g2d.setStroke(new BasicStroke(1.5f));
-        g2d.draw(bulletShape);
-        
-        // Draw trail (small line showing direction)
-        double heading = Math.toRadians(bullet.getHeading());
-        double trailLength = size * 2;
-        double dx = Math.sin(heading) * trailLength;
-        double dy = -Math.cos(heading) * trailLength;
-        
-        g2d.setColor(new Color(tracerColor.getRed(), tracerColor.getGreen(), 
-                              tracerColor.getBlue(), 150));
-        g2d.setStroke(new BasicStroke(1.0f));
-        g2d.drawLine(location.getX(), location.getY(),
-                     (int) Math.round(location.getX() - dx),
-                     (int) Math.round(location.getY() - dy));
+        // White hot center
+        g2d.setColor(Color.WHITE);
+        g2d.fill(new Ellipse2D.Double(
+            location.getX() - radius / 2,
+            location.getY() - radius / 2,
+            size / 2,
+            size / 2));
     }
     
     /**

@@ -2,8 +2,7 @@ package fr.ensibs.robots;
 
 import fr.ensibs.robots.factories.BattleFactory;
 import fr.ensibs.robots.factories.RobotTaskFactory;
-import fr.ensibs.robots.view.BattlefieldFrame;
-import fr.ensibs.robots.view.GraphicEngine;
+import fr.ensibs.robots.impl.EnhancedBattlefieldFrame;
 
 import javax.swing.*;
 
@@ -25,14 +24,9 @@ public class Launcher
         RobotTaskFactory taskFactory = new fr.ensibs.robots.impl.RobotTaskFactoryImpl();
 
         SwingUtilities.invokeLater(() -> {
-            // create the frame and display it
-            BattlefieldFrame frame = new BattlefieldFrame(factory, taskFactory);
-            frame.pack();
+            // create the enhanced frame and display it
+            EnhancedBattlefieldFrame frame = new EnhancedBattlefieldFrame(factory, taskFactory);
             frame.setVisible(true);
-
-            // start the graphic engine to refresh the view periodically
-            GraphicEngine graphicEngine = new GraphicEngine(frame.getContentPane());
-            graphicEngine.start(50);
         });
     }
 }

@@ -212,6 +212,32 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
     }
     
     /**
+     * Update bullets from the battlefield and render them.
+     * This should be called each frame to sync bullets with the panel.
+     * 
+     * @param battlefield the battlefield (must be BattlefieldImpl)
+     */
+    public void syncBullets(fr.ensibs.robots.logic.Battlefield battlefield)
+    {
+        if (!(battlefield instanceof BattlefieldImpl)) {
+            return; // Skip if not BattlefieldImpl
+        }
+        BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+        
+        // Clear old bullet views
+        additionalDrawables.removeIf(d -> d instanceof BulletView);
+        
+        // Add views for all active bullets
+        List<Bullet> bullets = impl.getBullets();
+        for (Bullet bullet : bullets) {
+            if (bullet.isActive()) {
+                BulletView bulletView = new BulletView(bullet);
+                additionalDrawables.add(bulletView);
+            }
+        }
+    }
+    
+    /**
      * Update particle system (should be called each frame).
      */
     public void updateParticles()

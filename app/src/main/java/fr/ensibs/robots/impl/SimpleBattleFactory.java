@@ -61,9 +61,9 @@ public class SimpleBattleFactory implements BattleFactory
     public <R extends Droid> DroidView<?> makeRobotView(R robot, String name, Color color)
     {
         if (robot instanceof Robot robotImpl) {
-            return new SimpleRobotView<>(robotImpl, name, color == null ? Color.BLUE : color);
+            return new NeonRobotView<>(robotImpl, name, color == null ? Color.CYAN : color);
         }
-        return new SimpleDroidView<>(robot, name, color == null ? Color.GRAY : color);
+        return new NeonDroidView<>(robot, name, color == null ? Color.ORANGE : color);
     }
 }
 

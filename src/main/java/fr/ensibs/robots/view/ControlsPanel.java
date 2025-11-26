@@ -192,12 +192,19 @@ public class ControlsPanel extends JPanel implements ActionListener
         columnModel.getColumn(0).setPreferredWidth(150);
         columnModel.getColumn(1).setPreferredWidth(50);
         
-        // ScrollPane - ENTIRE HIERARCHY
+        // SAFE MODE: TOTAL BLACKOUT - Style ENTIRE hierarchy
         JScrollPane scrollPane = new JScrollPane(robotsTable);
         scrollPane.setPreferredSize(new Dimension(200, 500));
-        scrollPane.setBackground(new Color(30, 30, 30)); // Container
-        scrollPane.getViewport().setBackground(new Color(30, 30, 30)); // CRITICAL: Viewport
-        scrollPane.getViewport().setOpaque(true); // Ensure viewport is opaque
+        
+        // Container
+        scrollPane.setBackground(new Color(30, 30, 30));
+        
+        // Viewport - CRITICAL: Must be dark
+        JViewport viewport = scrollPane.getViewport();
+        viewport.setBackground(new Color(30, 30, 30));
+        viewport.setOpaque(true);
+        
+        // Border
         scrollPane.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(new Color(51, 51, 51), 1),
             "UNIT_STATUS",
@@ -205,6 +212,7 @@ public class ControlsPanel extends JPanel implements ActionListener
             TitledBorder.TOP,
             new Font("Monospaced", Font.BOLD, 12),
             new Color(0, 255, 0))); // Terminal Green
+        
         add(scrollPane, BorderLayout.CENTER);
     }
 

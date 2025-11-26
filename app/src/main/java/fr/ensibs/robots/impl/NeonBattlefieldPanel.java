@@ -67,6 +67,14 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         // CRITICAL: Call super FIRST to clear and set up rendering context
         super.paintComponent(g);
         
+        Graphics2D g2d = (Graphics2D) g;
+        
+        // FIX 3: CLEAR SCREEN FIRST - The VERY FIRST thing after super
+        int panelWidth = getWidth();
+        int panelHeight = getHeight();
+        g2d.setColor(Color.BLACK);
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
+        
         // Calculate FPS
         long currentTime = System.nanoTime();
         long deltaTime = currentTime - lastFrameTime;
@@ -75,16 +83,11 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         }
         lastFrameTime = currentTime;
         
-        Graphics2D g2d = (Graphics2D) g;
-        
-        // Enable high-quality rendering
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // Disable expensive rendering hints for performance
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
         
         // Compute scale and margins
-        int panelWidth = getWidth();
-        int panelHeight = getHeight();
         double scale = Math.min(panelWidth * 1.0d / FIELD_WIDTH, panelHeight * 1.0d / FIELD_HEIGHT);
         double marginX = (panelWidth - FIELD_WIDTH * scale) / 2;
         double marginY = (panelHeight - FIELD_HEIGHT * scale) / 2;
@@ -92,28 +95,26 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(new AffineTransform(scale, 0, 0, scale, marginX, marginY));
         
-        // CRITICAL: Clear canvas at start of every frame to prevent artifacts
+        // Clear battlefield area
         g2d.setColor(BACKGROUND_DARK);
-        g2d.clearRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
         g2d.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
         
-        // 2. Grid (radar-style dark green)
+        // STRICT RENDERING ORDER (performance optimized):
+        // 1. Grid (radar-style dark green)
         drawDigitalGrid(g2d);
         
-        // 3. Borders
+        // 2. Borders
         drawDangerZoneBorders(g2d);
         
-        // 4. Robots (BEFORE bullets so they're visible)
+        // 3. Robots (BEFORE bullets so they're visible)
         drawRobots(g2d);
         
-        // 5. Bullets and trails
+        // 4. Bullets and trails (minimal effects for performance)
         drawAdditionalEntities(g2d);
         
-        // 6. Muzzle flashes
-        muzzleFlashSystem.draw(g2d);
-        
-        // 7. Particle effects
-        particleSystem.draw(g2d);
+        // DISABLED: Muzzle flashes and particles for performance
+        // muzzleFlashSystem.draw(g2d);
+        // particleSystem.draw(g2d);
         
         // Restore transform for screen-space drawing
         g2d.setTransform(originalTransform);

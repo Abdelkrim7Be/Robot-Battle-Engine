@@ -16,12 +16,9 @@ import java.awt.geom.AffineTransform;
  */
 class NeonDroidView<R extends Droid> extends DroidView<R>
 {
-    private static final int ENERGY_BAR_HEIGHT = 4;
-    private static final int ENERGY_BAR_WIDTH = BattleSetup.ROBOT_RADIUS * 2 + 6;
+    private static final int ENERGY_BAR_HEIGHT = 2;
+    private static final int ENERGY_BAR_WIDTH = 40; // Match body width
     private static final int MAX_ENERGY = BattleSetup.DROID_INITIAL_ENERGY;
-    
-    // Neon glow effect
-    private static final int GLOW_RADIUS = 2;
     
     NeonDroidView(R robot, String name, Color color)
     {
@@ -52,14 +49,14 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
     }
     
     /**
-     * Draw tank chassis - CLEAR GEOMETRY, NO GLOW.
-     * Body: Rectangle with team color outline.
+     * FIX 1: SOLID GEOMETRY ONLY - High contrast, no blur/glow.
+     * Body: 40x40px Rectangle, DARK_GRAY fill, Team Color border.
      */
     private void drawTankChassis(Graphics2D g2d)
     {
-        int radius = BattleSetup.ROBOT_RADIUS;
-        int width = 40; // Fixed 40px as specified
-        int height = 40; // Fixed 40px as specified
+        // Exact dimensions as specified
+        int width = 40; // 40px width
+        int height = 40; // 40px height
         
         Color teamColor = getColor();
         if (getRobot().getEnergy() <= 0) {
@@ -69,16 +66,20 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
         // Body: Rectangle (40x40px)
         Rectangle body = new Rectangle(-width / 2, -height / 2, width, height);
         
-        // Fill: Dark gray (or team color with 50% opacity)
-        Color fillColor = new Color(teamColor.getRed(), teamColor.getGreen(), 
-                                   teamColor.getBlue(), 128); // 50% opacity
-        g2d.setColor(fillColor);
+        // Fill: DARK_GRAY (Solid, no opacity tricks)
+        g2d.setColor(Color.DARK_GRAY);
         g2d.fill(body);
         
-        // Outline: 2px solid stroke in Team Color
+        // Border: 2px Thick Line in Team Color (makes it visible against black)
         g2d.setColor(teamColor);
         g2d.setStroke(new BasicStroke(2.0f));
         g2d.draw(body);
+        
+        // Front indicator (small triangle to show direction)
+        int[] xPoints = {0, -8, 8};
+        int[] yPoints = {-height / 2, -height / 2 - 10, -height / 2};
+        g2d.setColor(teamColor);
+        g2d.fillPolygon(xPoints, yPoints, 3);
     }
     
     @Override
@@ -101,24 +102,30 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
     }
     
     /**
-     * Draw turret barrel - CLEAR GEOMETRY, NO GLOW.
-     * Gun: Long Rectangle/Line (4px wide, 30px long).
+     * FIX 1: SOLID GEOMETRY ONLY - Gun turret.
+     * Gun: 6px width, 35px length, LIGHT_GRAY fill, mounted at body center.
      */
     private void drawTurret(Graphics2D g2d)
     {
-        // Gun: 4px wide, 30px long
-        double gunWidth = 4.0;
-        double gunLength = 30.0;
+        // Exact dimensions as specified
+        int gunWidth = 6; // 6px width
+        int gunLength = 35; // 35px length
         
-        // Fill: Gray
-        g2d.setColor(Color.GRAY);
-        Rectangle gun = new Rectangle((int) (-gunWidth / 2), (int) (-gunLength / 2), 
-                                     (int) gunWidth, (int) gunLength);
+        // Gun: Rectangle (6px x 35px)
+        Rectangle gun = new Rectangle(-gunWidth / 2, -gunLength / 2, gunWidth, gunLength);
+        
+        // Fill: LIGHT_GRAY (Solid)
+        g2d.setColor(Color.LIGHT_GRAY);
         g2d.fill(gun);
+        
+        // Border for visibility
+        g2d.setColor(Color.WHITE);
+        g2d.setStroke(new BasicStroke(1.0f));
+        g2d.draw(gun);
     }
     
     /**
-     * Draw health bar above robot (tiny horizontal line as specified).
+     * Draw health bar above robot (tiny horizontal line).
      * Green if > 50%, Red if < 20%.
      */
     private void drawNeonEnergyBar(Graphics2D g2d, Location location)
@@ -128,26 +135,30 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
             ? BattleSetup.ROBOT_INITIAL_ENERGY 
             : MAX_ENERGY;
         
+        if (energy <= 0) {
+            return; // Don't draw for dead robots
+        }
+        
         double energyRatio = Math.max(0.0, Math.min(1.0, energy / (double) maxEnergy));
         int barX = location.getX() - ENERGY_BAR_WIDTH / 2;
-        int barY = location.getY() - BattleSetup.ROBOT_RADIUS - ENERGY_BAR_HEIGHT - 4;
+        int barY = location.getY() - 25; // Above 40px body
         
-        // Tiny horizontal line (as specified)
+        // Tiny horizontal line
         int fillWidth = (int) (ENERGY_BAR_WIDTH * energyRatio);
         if (fillWidth > 0) {
             // Color: Green if > 50%, Red if < 20%, Yellow otherwise
             Color energyColor;
             if (energyRatio > 0.5) {
-                energyColor = Color.GREEN; // Green if > 50%
+                energyColor = Color.GREEN;
             } else if (energyRatio < 0.2) {
-                energyColor = Color.RED; // Red if < 20%
+                energyColor = Color.RED;
             } else {
-                energyColor = Color.YELLOW; // Yellow otherwise
+                energyColor = Color.YELLOW;
             }
             
-            // Draw tiny horizontal line
+            // Draw tiny horizontal line (1px stroke for performance)
             g2d.setColor(energyColor);
-            g2d.setStroke(new BasicStroke(2.0f));
+            g2d.setStroke(new BasicStroke(1.0f));
             g2d.drawLine(barX, barY, barX + fillWidth, barY);
         }
     }

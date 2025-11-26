@@ -6,6 +6,7 @@ import fr.ensibs.robots.logic.*;
 import fr.ensibs.robots.logic.Robot;
 
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumnModel;
@@ -47,7 +48,8 @@ public class ControlsPanel extends JPanel implements ActionListener
     public ControlsPanel(List<DroidView<? extends Droid>> views, BattleFactory factory, RobotTaskFactory taskFactory)
     {
         super(new BorderLayout(5, 5));
-        setBackground(Color.WHITE);
+        setBackground(new Color(26, 26, 26)); // #1A1A1A Dark Grey
+        setBorder(BorderFactory.createLineBorder(new Color(51, 51, 51), 1)); // #333333 border
 
         this.views = views;
         this.factory = factory;
@@ -153,8 +155,16 @@ public class ControlsPanel extends JPanel implements ActionListener
     {
         // START/STOP button only (no manual load button)
         JPanel buttonPanel = new JPanel(new GridLayout(1, 1, 5, 5));
+        buttonPanel.setBackground(new Color(26, 26, 26)); // #1A1A1A
+        
         startButton = new JButton(START);
         startButton.addActionListener(this);
+        // Dark sci-fi button styling
+        startButton.setBackground(new Color(13, 13, 13)); // #0D0D0D
+        startButton.setForeground(new Color(0, 255, 0)); // Terminal Green
+        startButton.setFont(new Font("Monospaced", Font.BOLD, 12));
+        startButton.setBorder(BorderFactory.createLineBorder(new Color(51, 51, 51), 1));
+        startButton.setFocusPainted(false);
         buttonPanel.add(startButton);
         add(buttonPanel, BorderLayout.NORTH);
 
@@ -163,13 +173,26 @@ public class ControlsPanel extends JPanel implements ActionListener
         robotsTable.setRowSelectionAllowed(false);
         robotsTable.setCellSelectionEnabled(false);
         robotsTable.setDefaultRenderer(String.class, new RobotCellRenderer(views));
+        // Dark sci-fi table styling
+        robotsTable.setBackground(new Color(13, 13, 13)); // #0D0D0D
+        robotsTable.setForeground(new Color(0, 255, 0)); // Terminal Green
+        robotsTable.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        robotsTable.setGridColor(new Color(51, 51, 51)); // #333333
         TableColumnModel columnModel = robotsTable.getColumnModel();
         columnModel.getColumn(0).setPreferredWidth(150);
         columnModel.getColumn(1).setPreferredWidth(50);
         // insert the table in a scroll pane
         JScrollPane scrollPane = new JScrollPane(robotsTable);
         scrollPane.setPreferredSize(new Dimension(200, 500));
-        scrollPane.getViewport().setBackground(Color.WHITE);
+        scrollPane.setBackground(new Color(26, 26, 26));
+        scrollPane.getViewport().setBackground(new Color(13, 13, 13));
+        scrollPane.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(new Color(51, 51, 51), 1),
+            "UNIT_STATUS",
+            TitledBorder.LEFT,
+            TitledBorder.TOP,
+            new Font("Monospaced", Font.BOLD, 12),
+            new Color(0, 255, 0))); // Terminal Green
         add(scrollPane, BorderLayout.CENTER);
     }
 
@@ -246,11 +269,10 @@ public class ControlsPanel extends JPanel implements ActionListener
         {
             setText((String) value);
 
-            // define the cell background and foreground colors
-            Color color = views.get(row).getColor();
-            setBackground(color);
-            double lightness = (0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue());
-            setForeground(lightness < 128 ? Color.WHITE : Color.BLACK);
+            // Dark sci-fi cell styling
+            setBackground(new Color(13, 13, 13)); // #0D0D0D
+            setForeground(new Color(0, 255, 0)); // Terminal Green
+            setFont(new Font("Monospaced", Font.PLAIN, 11));
 
             // define the text alignment (left for names and center for energy values)
             setHorizontalAlignment(col == 1 ? JLabel.CENTER : JLabel.LEFT);

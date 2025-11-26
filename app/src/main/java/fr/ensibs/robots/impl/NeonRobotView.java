@@ -7,8 +7,6 @@ import fr.ensibs.robots.view.RobotView;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Arc2D;
-import java.awt.geom.Ellipse2D;
 
 /**
  * Neon-themed robot view with radar field visualization.
@@ -40,89 +38,46 @@ class NeonRobotView<R extends Robot> extends RobotView<R>
     {
         Location location = getRobot().getLocation();
         double radarHeading = getRobot().getRadarHeading();
-        double halfField = Math.toRadians(BattleSetup.VISION_FIELD / 2.0);
-        
-        // Draw radar field of vision (cone)
-        drawRadarField(g2d, location, Math.toRadians(radarHeading), halfField);
         
         AffineTransform originalTransform = g2d.getTransform();
         
         g2d.translate(location.getX(), location.getY());
         g2d.rotate(Math.toRadians(radarHeading));
         
-        // Draw radar dish
+        // Draw radar dish only (no field visualization to prevent trails)
         drawRadarDish(g2d);
         
         g2d.setTransform(originalTransform);
     }
     
     /**
-     * Draw radar dish with neon cyan color.
+     * Draw radar dish - CLEAR GEOMETRY, NO GLOW.
+     * Radar: Triangle or Arc sitting on top of the Gun.
      */
     private void drawRadarDish(Graphics2D g2d)
     {
-        int radius = BattleSetup.ROBOT_RADIUS;
-        double dishRadius = radius * 0.9;
-        double dishLength = RADAR_LENGTH;
+        // Radar: Triangle sitting on top of gun
+        int[] xPoints = {-6, 0, 6};
+        int[] yPoints = {-25, -35, -25}; // Positioned above gun
         
-        // Draw radar dish (semi-circle)
-        Ellipse2D radarDish = new Ellipse2D.Double(
-            -dishRadius / 2.0, -dishLength, dishRadius, dishRadius);
+        // Color: White
+        g2d.setColor(Color.WHITE);
+        g2d.fillPolygon(xPoints, yPoints, 3);
         
-        // Neon cyan color
-        Color radarColor = new Color(0, 255, 255, 200); // Bright cyan
-        
-        // Glow
-        g2d.setColor(new Color(0, 200, 200, 100));
-        Ellipse2D glow = new Ellipse2D.Double(
-            -dishRadius / 2.0 - 2, -dishLength - 2,
-            dishRadius + 4, dishRadius + 4);
-        g2d.fill(glow);
-        
-        // Main dish
-        g2d.setColor(radarColor);
-        g2d.fill(radarDish);
-        
-        // Border
-        g2d.setColor(new Color(0, 255, 255));
-        g2d.setStroke(new BasicStroke(2.0f));
-        g2d.draw(radarDish);
-        
-        // Beam line (bright yellow)
-        g2d.setColor(new Color(255, 255, 0, 220));
-        g2d.setStroke(new BasicStroke(2.5f));
-        g2d.drawLine(0, 0, 0, (int) -dishLength);
+        // Outline
+        g2d.setColor(Color.LIGHT_GRAY);
+        g2d.setStroke(new BasicStroke(1.0f));
+        g2d.drawPolygon(xPoints, yPoints, 3);
     }
     
     /**
-     * Draw radar field of vision as a semi-transparent cone (green as specified).
+     * Draw radar field of vision - REMOVED to prevent trail artifacts.
+     * Radar cone should not persist between frames.
      */
     private void drawRadarField(Graphics2D g2D, Location location, double heading, double halfField)
     {
-        double startAngle = Math.toDegrees(heading - halfField);
-        double arcAngle = Math.toDegrees(halfField * 2);
-        int radius = (int) (RADAR_LENGTH * 1.8);
-        int arcX = location.getX() - radius;
-        int arcY = location.getY() - radius;
-        int diameter = radius * 2;
-        
-        // Save composite
-        Composite original = g2D.getComposite();
-        
-        // Draw semi-transparent cone (green as specified: new Color(0, 255, 0, 50))
-        g2D.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.2f)); // 50/255 ≈ 0.2
-        g2D.setColor(new Color(0, 255, 0, 50)); // Green with 50 alpha
-        
-        // Draw arc (pie slice)
-        Arc2D arc = new Arc2D.Double(arcX, arcY, diameter, diameter,
-                                    startAngle, arcAngle, Arc2D.PIE);
-        g2D.fill(arc);
-        
-        // Draw border
-        g2D.setComposite(original);
-        g2D.setColor(new Color(0, 150, 0, 100)); // Darker green border
-        g2D.setStroke(new BasicStroke(1.5f));
-        g2D.draw(arc);
+        // DISABLED: Radar field visualization removed to prevent trail artifacts
+        // The radar dish triangle is sufficient to show radar direction
     }
 }
 

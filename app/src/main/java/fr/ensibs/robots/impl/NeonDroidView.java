@@ -7,7 +7,6 @@ import fr.ensibs.robots.view.DroidView;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.RoundRectangle2D;
 
 /**
  * Neon-themed droid view with cyber-military aesthetic.
@@ -53,48 +52,33 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
     }
     
     /**
-     * Draw tank chassis with neon team color and treads.
+     * Draw tank chassis - CLEAR GEOMETRY, NO GLOW.
+     * Body: Rectangle with team color outline.
      */
     private void drawTankChassis(Graphics2D g2d)
     {
         int radius = BattleSetup.ROBOT_RADIUS;
-        int width = radius * 2;
-        int height = (int) (radius * 1.8);
+        int width = 40; // Fixed 40px as specified
+        int height = 40; // Fixed 40px as specified
         
-        // CRITICAL FIX: Use high-contrast colors for visibility
-        // Body: Dark gray fill with CYAN outline (high visibility on dark background)
         Color teamColor = getColor();
         if (getRobot().getEnergy() <= 0) {
             teamColor = new Color(50, 50, 50); // Dark gray when dead
         }
         
-        // Main body - DARK GRAY fill (visible on dark background)
-        RoundRectangle2D body = new RoundRectangle2D.Double(
-            -width / 2.0, -height / 2.0, width, height,
-            radius * 0.4, radius * 0.4);
+        // Body: Rectangle (40x40px)
+        Rectangle body = new Rectangle(-width / 2, -height / 2, width, height);
         
-        // Fill with dark gray (high contrast)
-        g2d.setColor(Color.DARK_GRAY);
+        // Fill: Dark gray (or team color with 50% opacity)
+        Color fillColor = new Color(teamColor.getRed(), teamColor.getGreen(), 
+                                   teamColor.getBlue(), 128); // 50% opacity
+        g2d.setColor(fillColor);
         g2d.fill(body);
         
-        // Outline with CYAN (high visibility)
-        g2d.setColor(Color.CYAN);
+        // Outline: 2px solid stroke in Team Color
+        g2d.setColor(teamColor);
         g2d.setStroke(new BasicStroke(2.0f));
         g2d.draw(body);
-        
-        // Draw treads (side details) - lighter gray
-        g2d.setColor(new Color(100, 100, 100));
-        g2d.setStroke(new BasicStroke(1.5f));
-        // Left tread
-        g2d.drawLine(-width / 2, -height / 4, -width / 2, height / 4);
-        // Right tread
-        g2d.drawLine(width / 2, -height / 4, width / 2, height / 4);
-        
-        // Front indicator (direction arrow) - CYAN for visibility
-        int[] xPoints = {radius, 0, -radius};
-        int[] yPoints = {-height / 2 - 3, -height / 2 - 8, -height / 2 - 3};
-        g2d.setColor(Color.CYAN);
-        g2d.fillPolygon(xPoints, yPoints, 3);
     }
     
     @Override
@@ -117,65 +101,20 @@ class NeonDroidView<R extends Droid> extends DroidView<R>
     }
     
     /**
-     * Draw turret barrel with heat-based color.
-     * CRITICAL: Use lighter gray for visibility on dark background.
+     * Draw turret barrel - CLEAR GEOMETRY, NO GLOW.
+     * Gun: Long Rectangle/Line (4px wide, 30px long).
      */
     private void drawTurret(Graphics2D g2d)
     {
-        int radius = BattleSetup.ROBOT_RADIUS;
-        double gunLength = radius * 3.0;
-        double gunWidth = radius * 0.5;
+        // Gun: 4px wide, 30px long
+        double gunWidth = 4.0;
+        double gunLength = 30.0;
         
-        // Heat-based color: cool = light gray, hot = red-orange
-        int gunHeat = getRobot().getGunHeat();
-        int maxHeat = 50; // BattleSetup.MAX_GUN_HEAT
-        float heatRatio = Math.min(1.0f, gunHeat / (float) maxHeat);
-        
-        Color gunColor;
-        if (heatRatio > 0.5f) {
-            // Hot: red-orange gradient
-            int red = 255;
-            int green = (int) (255 * (1.0f - heatRatio));
-            int blue = 0;
-            gunColor = new Color(red, green, blue);
-        } else {
-            // Cool: LIGHT gray (was dark gray - too hard to see)
-            int gray = 150 + (int) (50 * heatRatio);
-            gunColor = new Color(gray, gray, gray);
-        }
-        
-        // Draw turret barrel
-        RoundRectangle2D turret = new RoundRectangle2D.Double(
-            -gunWidth / 2.0, -gunLength / 2.0, gunWidth, gunLength,
-            gunWidth * 0.5, gunWidth * 0.5);
-        
-        // Glow for hot guns
-        if (heatRatio > 0.3f) {
-            g2d.setColor(new Color(gunColor.getRed(), gunColor.getGreen(), 
-                                  gunColor.getBlue(), 80));
-            g2d.fill(new RoundRectangle2D.Double(
-                -gunWidth / 2.0 - 1, -gunLength / 2.0 - 1,
-                gunWidth + 2, gunLength + 2,
-                gunWidth * 0.5, gunWidth * 0.5));
-        }
-        
-        g2d.setColor(gunColor);
-        g2d.fill(turret);
-        
-        // Border
-        g2d.setColor(new Color(
-            Math.min(255, gunColor.getRed() + 30),
-            Math.min(255, gunColor.getGreen() + 30),
-            Math.min(255, gunColor.getBlue() + 30)
-        ));
-        g2d.setStroke(new BasicStroke(1.5f));
-        g2d.draw(turret);
-        
-        // Muzzle tip
-        int tipSize = (int) (radius * 0.4);
-        g2d.setColor(new Color(200, 200, 100));
-        g2d.fillOval(-tipSize / 2, (int) (-gunLength / 2 - tipSize / 2), 
-                     tipSize, tipSize);
+        // Fill: Gray
+        g2d.setColor(Color.GRAY);
+        Rectangle gun = new Rectangle((int) (-gunWidth / 2), (int) (-gunLength / 2), 
+                                     (int) gunWidth, (int) gunLength);
+        g2d.fill(gun);
     }
     
     /**

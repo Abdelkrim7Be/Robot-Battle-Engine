@@ -92,9 +92,9 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(new AffineTransform(scale, 0, 0, scale, marginX, marginY));
         
-        // STRICT RENDERING ORDER:
-        // 1. Background (dark)
+        // CRITICAL: Clear canvas at start of every frame to prevent artifacts
         g2d.setColor(BACKGROUND_DARK);
+        g2d.clearRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
         g2d.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
         
         // 2. Grid (radar-style dark green)

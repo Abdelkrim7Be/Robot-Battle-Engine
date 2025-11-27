@@ -161,8 +161,9 @@ class HeatTest
     }
 
     /**
-     * Test specific check: fire() fails if gunHeat is too high.
-     * This is the specific test mentioned in the mission requirements.
+     * PHASE 5: Test specific check: fire() fails if gunHeat is too high.
+     * Mission requirement: Fire -> Heat goes up. Try to Fire again immediately -> Assert Failure.
+     * Wait 10 ticks -> Assert Success.
      */
     @Test
     void testFireFailsIfGunHeatTooHigh()
@@ -192,6 +193,51 @@ class HeatTest
             assertThrows(GunOverheatedException.class, () -> {
                 droid.fire(1);
             }, "fire() should fail if gunHeat > 1");
+        }
+    }
+    
+    /**
+     * PHASE 5: Mission requirement test: Fire -> Heat goes up. 
+     * Try to Fire again immediately -> Assert Failure. 
+     * Wait 10 ticks -> Assert Success.
+     */
+    @Test
+    void testFireLockoutAndCooldown()
+    {
+        Droid droid = factory.makeDroid();
+        Battlefield battlefield = factory.makeBattlefield();
+        
+        try {
+            // Fire -> Heat goes up
+            droid.fire(5); // Heat = 1 + (5/5) = 2
+            int heatAfterFirstFire = droid.getGunHeat();
+            assertTrue(heatAfterFirstFire > 1, "Heat should be > 1 after firing");
+            
+            // Try to Fire again immediately -> Assert Failure
+            assertThrows(GunOverheatedException.class, () -> {
+                droid.fire(1);
+            }, "Should throw GunOverheatedException when trying to fire immediately after firing");
+            
+            // Wait 10 ticks -> Assert Success
+            // Each tick decreases heat by GUN_COOLING (5)
+            // After 10 ticks: heat should decrease by 10 * 5 = 50
+            // Since heat was 2, it should be 0 after cooling
+            for (int i = 0; i < 10; i++) {
+                battlefield.decreaseGunHeats();
+            }
+            
+            // Heat should be 0 or low enough to fire
+            int heatAfterCooldown = droid.getGunHeat();
+            assertTrue(heatAfterCooldown <= 1, 
+                "Heat should be <= 1 after 10 ticks of cooldown");
+            
+            // Now firing should succeed
+            assertDoesNotThrow(() -> {
+                droid.fire(1);
+            }, "Should be able to fire after cooldown");
+            
+        } catch (GunOverheatedException | fr.ensibs.robots.logic.ExhaustedException e) {
+            fail("Unexpected exception: " + e);
         }
     }
 }

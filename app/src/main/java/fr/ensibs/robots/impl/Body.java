@@ -65,6 +65,16 @@ class Body
     }
     
     /**
+     * Set the heading of the body directly.
+     * 
+     * @param heading the new heading in degrees
+     */
+    void setHeading(double heading)
+    {
+        this.heading = normalize(heading);
+    }
+    
+    /**
      * Rotate the body by the given angle in degrees.
      * 
      * <p>A positive value rotates right (clockwise), negative rotates left (counter-clockwise).

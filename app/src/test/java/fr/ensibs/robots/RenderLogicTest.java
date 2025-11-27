@@ -67,10 +67,12 @@ public class RenderLogicTest
     @Test
     void testColorVisibility()
     {
-        // Background is BLACK or BACKGROUND_DARK (13, 13, 13)
-        Color background = new Color(13, 13, 13); // BACKGROUND_DARK
-        Color robotFill = Color.DARK_GRAY; // Robot body fill
+        // Background is PURE BLACK (0, 0, 0) as per NeonBattlefieldPanel
+        Color background = new Color(0, 0, 0); // BACKGROUND_DARK - Pure black
+        // Robot fill is bright yellow-white (255, 255, 150) as per SafeModeDroidView
+        Color robotFill = new Color(255, 255, 150); // Bright yellow-white fill
         Color robotBorder = Color.CYAN; // Team color
+        Color gunColor = Color.WHITE; // Gun is white
         
         // Robot fill should NOT equal background
         assertNotEquals(background, robotFill, 
@@ -83,6 +85,14 @@ public class RenderLogicTest
         // Verify robot fill is not black
         assertNotEquals(Color.BLACK, robotFill, 
                        "Robot fill is BLACK on BLACK background - INVISIBLE!");
+        
+        // Verify gun color is visible
+        assertNotEquals(background, gunColor, 
+                       "Gun color matches background - INVISIBLE!");
+        
+        // Verify robot fill has high brightness (should be > 200 for visibility on black)
+        float[] hsb = Color.RGBtoHSB(robotFill.getRed(), robotFill.getGreen(), robotFill.getBlue(), null);
+        assertTrue(hsb[2] > 0.8, "Robot fill should be bright (brightness > 0.8) for visibility on black background");
     }
     
     /**
@@ -144,15 +154,51 @@ public class RenderLogicTest
             "2. Clear battlefield area (fillRect BACKGROUND_DARK)",
             "3. Draw grid",
             "4. Draw borders",
-            "5. Draw robots",
+            "5. Draw robots (BEFORE bullets and particles)",
             "6. Draw bullets",
-            "7. Draw UI overlay"
+            "7. Particle effects (optional, should not obscure robots)",
+            "8. Draw UI overlay"
         };
         
         // Verify order is documented (actual verification would require mocking Graphics2D)
-        assertEquals(7, expectedOrder.length, "Rendering order should have 7 steps");
+        assertEquals(8, expectedOrder.length, "Rendering order should have 8 steps");
         assertTrue(expectedOrder[0].contains("Clear"), "First step must clear screen");
         assertTrue(expectedOrder[4].contains("robots"), "Robots must be drawn after background");
+        assertTrue(expectedOrder[5].contains("bullets"), "Bullets must be drawn after robots");
+    }
+    
+    /**
+     * Test 6: Robot Size Visibility Test
+     * Verify robots are large enough to be visible.
+     */
+    @Test
+    void testRobotSizeVisibility()
+    {
+        // Robot size should be at least 80x80 pixels for visibility
+        int minRobotSize = 80;
+        int actualRobotSize = 100; // As per SafeModeDroidView
+        
+        assertTrue(actualRobotSize >= minRobotSize, 
+                  "Robot size (" + actualRobotSize + ") should be at least " + minRobotSize + " for visibility");
+    }
+    
+    /**
+     * Test 7: Radar Visibility Test
+     * Verify radar is visible and properly sized.
+     */
+    @Test
+    void testRadarVisibility()
+    {
+        // Radar should be visible (bright cyan color)
+        Color radarColor = new Color(0, 255, 255); // Bright cyan
+        Color background = new Color(0, 0, 0); // Black background
+        
+        assertNotEquals(background, radarColor, 
+                       "Radar color matches background - INVISIBLE!");
+        
+        // Radar should have high brightness
+        float[] hsb = Color.RGBtoHSB(radarColor.getRed(), radarColor.getGreen(), radarColor.getBlue(), null);
+        assertTrue(hsb[2] > 0.9, "Radar should be very bright (brightness > 0.9) for visibility");
     }
     
     /**

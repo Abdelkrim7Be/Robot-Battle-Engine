@@ -1,5 +1,6 @@
 package fr.ensibs.robots.impl;
 
+import fr.ensibs.robots.logic.BattleSetup;
 import fr.ensibs.robots.logic.CollisionException;
 import fr.ensibs.robots.logic.Droid;
 import fr.ensibs.robots.logic.ExhaustedException;
@@ -31,7 +32,12 @@ class BaseDroid implements Droid
     private final Body body;
     private final Gun gun;
     private int energy;
+    private final int maxEnergy; // MISSION A.4: Store initial energy as max energy
     private final List<TeamMessage> messageQueue; // Queue of received messages
+    
+    // MISSION A.4: Track movement and firing for passive regeneration
+    private boolean movedThisTick = false;
+    private boolean firedThisTick = false;
 
     BaseDroid(BattlefieldImpl battlefield, Location spawn, int initialEnergy, double initialHeading)
     {
@@ -39,6 +45,7 @@ class BaseDroid implements Droid
         this.body = new Body(spawn, initialHeading);
         this.gun = new Gun(body, initialHeading);
         this.energy = initialEnergy;
+        this.maxEnergy = initialEnergy; // MISSION A.4: Store initial energy as max
         this.messageQueue = new ArrayList<>();
     }
 
@@ -138,12 +145,14 @@ class BaseDroid implements Droid
     @Override
     public void fire(int firePower) throws GunOverheatedException, ExhaustedException
     {
+        firedThisTick = true;
         battlefield.fire(this, firePower);
     }
 
     @Override
     public void move(double distance) throws CollisionException, ExhaustedException
     {
+        movedThisTick = true;
         battlefield.move(this, distance);
     }
 
@@ -336,6 +345,104 @@ class BaseDroid implements Droid
     }
     
     /**
+     * Aim gun predictively at a moving target using intercept calculation.
+     * 
+     * <p>This method uses predictive targeting to calculate where the target
+     * will be when the bullet arrives, accounting for target velocity and
+     * bullet travel time.
+     * 
+     * <p>MISSION 1.1: Predictive Targeting - eliminates "random turning bullshit"
+     * by making robots aim where targets will be, not where they are.
+     * 
+     * @param targetPos the current position of the target
+     * @param targetVelX the X component of target velocity (pixels per tick)
+     * @param targetVelY the Y component of target velocity (pixels per tick)
+     * @param bulletPower the power of the bullet to fire (affects bullet speed)
+     */
+    void aimPredictively(Location targetPos, double targetVelX, double targetVelY, int bulletPower)
+    {
+        // Calculate bullet speed based on power
+        double bulletSpeed = PredictiveTargeting.calculateBulletSpeed(bulletPower);
+        
+        // Get gun barrel tip position (where bullet spawns)
+        Location shooterPos = getLocation();
+        double gunHeading = getGunHeading();
+        double gunHeadingRad = Math.toRadians(gunHeading);
+        
+        // Calculate barrel tip position (matches BattlefieldImpl.fire logic)
+        double barrelLength = BattleSetup.ROBOT_RADIUS + 25.0; // ROBOT_RADIUS + gun extension
+        double barrelTipX = shooterPos.getX() + (barrelLength * Math.sin(gunHeadingRad));
+        double barrelTipY = shooterPos.getY() - (barrelLength * Math.cos(gunHeadingRad));
+        Location barrelTipPos = new Location((int) Math.round(barrelTipX), (int) Math.round(barrelTipY));
+        
+        // Calculate intercept heading
+        Double interceptHeading = PredictiveTargeting.calculateIntercept(
+            barrelTipPos,
+            targetPos,
+            targetVelX,
+            targetVelY,
+            bulletSpeed
+        );
+        
+        if (interceptHeading == null) {
+            // Fall back to simple aiming if intercept calculation fails
+            aimAt(targetPos);
+            return;
+        }
+        
+        // Turn gun to intercept heading
+        double currentGunHeading = getGunHeading();
+        double turnAngle = interceptHeading - currentGunHeading;
+        
+        // Normalize turn angle to shortest path
+        if (turnAngle > 180) {
+            turnAngle -= 360;
+        } else if (turnAngle < -180) {
+            turnAngle += 360;
+        }
+        
+        turnGun(turnAngle);
+    }
+    
+    /**
+     * Calculate the predicted intercept heading for a moving target.
+     * 
+     * <p>This is a utility method that RobotTask implementations can use
+     * to calculate intercept headings without automatically turning the gun.
+     * 
+     * @param targetPos the current position of the target
+     * @param targetVelX the X component of target velocity (pixels per tick)
+     * @param targetVelY the Y component of target velocity (pixels per tick)
+     * @param bulletPower the power of the bullet to fire (affects bullet speed)
+     * @return the intercept heading in degrees (0-360), or null if no solution exists
+     */
+    Double calculateInterceptHeading(Location targetPos, double targetVelX, double targetVelY, int bulletPower)
+    {
+        // Calculate bullet speed based on power
+        double bulletSpeed = PredictiveTargeting.calculateBulletSpeed(bulletPower);
+        
+        // Get gun barrel tip position (where bullet spawns)
+        Location shooterPos = getLocation();
+        double gunHeading = getGunHeading();
+        double gunHeadingRad = Math.toRadians(gunHeading);
+        
+        // Calculate barrel tip position (matches BattlefieldImpl.fire logic)
+        double barrelLength = BattleSetup.ROBOT_RADIUS + 25.0; // ROBOT_RADIUS + gun extension
+        double barrelTipX = shooterPos.getX() + (barrelLength * Math.sin(gunHeadingRad));
+        double barrelTipY = shooterPos.getY() - (barrelLength * Math.cos(gunHeadingRad));
+        Location barrelTipPos = new Location((int) Math.round(barrelTipX), (int) Math.round(barrelTipY));
+        
+        // Calculate and return intercept heading
+        return PredictiveTargeting.calculateIntercept(
+            barrelTipPos,
+            targetPos,
+            targetVelX,
+            targetVelY,
+            bulletSpeed
+        );
+    }
+    
+    /**
      * Get the current message queue (for testing/debugging).
      * 
      * @return a copy of the message queue
@@ -343,6 +450,57 @@ class BaseDroid implements Droid
     List<TeamMessage> getMessageQueue()
     {
         return new ArrayList<>(messageQueue);
+    }
+    
+    /**
+     * MISSION A.4: Check if robot moved this tick.
+     * 
+     * @return true if robot moved this tick
+     */
+    boolean isMoving()
+    {
+        return movedThisTick;
+    }
+    
+    /**
+     * MISSION A.4: Check if robot fired this tick.
+     * 
+     * @return true if robot fired this tick
+     */
+    boolean hasFiredThisTick()
+    {
+        return firedThisTick;
+    }
+    
+    /**
+     * MISSION A.4: Reset movement and firing flags for next tick.
+     * Should be called at the start of each game tick.
+     */
+    void resetTickFlags()
+    {
+        movedThisTick = false;
+        firedThisTick = false;
+    }
+    
+    /**
+     * MISSION A.4: Get maximum energy (starting energy).
+     * 
+     * @return the maximum energy value
+     */
+    int getMaxEnergy()
+    {
+        return maxEnergy;
+    }
+    
+    /**
+     * MISSION A.4: Add energy (for passive regeneration).
+     * 
+     * @param amount the amount of energy to add
+     */
+    void addEnergy(int amount)
+    {
+        int maxEnergy = getMaxEnergy();
+        this.energy = Math.min(maxEnergy, this.energy + amount);
     }
 }
 

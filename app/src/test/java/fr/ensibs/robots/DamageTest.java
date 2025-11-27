@@ -75,13 +75,26 @@ class DamageTest
     }
 
     /**
-     * Test the specific case mentioned in mission requirements:
-     * calculateDamage(power=3) returns 12 + 2*(2) = 16
-     * 
-     * This test verifies the damage formula by calculating it manually.
+     * PHASE 5: Test the specific case mentioned in mission requirements:
+     * Fire with Power 1. Assert Damage = 4.
      */
     @Test
-    void testSpecificDamageCalculation()
+    void testDamagePowerOne()
+    {
+        int power = 1;
+        // Base Damage: 4 * power = 4
+        // Bonus Damage: power is NOT > 1, so no bonus
+        int expectedDamage = 4 * power; // = 4
+        assertEquals(4, expectedDamage,
+            "Damage for power=1 should be 4 (no bonus)");
+    }
+    
+    /**
+     * PHASE 5: Test the specific case mentioned in mission requirements:
+     * Fire with Power 3. Assert Damage = 16 (4*3 + 2*(3-1)).
+     */
+    @Test
+    void testDamagePowerThree()
     {
         int power = 3;
         
@@ -95,22 +108,9 @@ class DamageTest
         int expectedDamage = baseDamage + bonusDamage;
         
         assertEquals(16, expectedDamage,
-            "Damage for power=3 should be 12 + 2*(2) = 16");
+            "Damage for power=3 should be 4*3 + 2*(3-1) = 16");
     }
 
-    /**
-     * Test edge case: power = 1 (no bonus damage).
-     */
-    @Test
-    void testDamagePowerOne()
-    {
-        int power = 1;
-        // Base: 4 * 1 = 4
-        // Bonus: power is NOT > 1, so no bonus
-        int expected = 4 * power; // = 4
-        assertEquals(4, expected,
-            "Damage for power=1 should be 4 (no bonus)");
-    }
 
     /**
      * Test life steal: shooter gains 3 × power energy on hit.

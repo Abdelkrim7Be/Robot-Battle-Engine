@@ -37,22 +37,53 @@ class SafeModeRobotView<R extends Robot> extends RobotView<R>
         double y = location.getY();
         double radarHeading = getRobot().getRadarHeading();
         
-        // SAFE MODE: Simple circle
-        // CRITICAL FIX: Translate to center, rotate, then draw centered
+        // MISSION 3: Fix radar ghosting - only draw radar dish, no scan arc
+        // CRITICAL: Save transform - the panel has already applied battlefield coordinate transform
         AffineTransform old = g2d.getTransform();
         
-        // Translate to robot center
+        // Translate to robot center (in battlefield coordinates)
         g2d.translate(x, y);
         // Rotate radar independently
         g2d.rotate(Math.toRadians(radarHeading));
         
-        // Draw radar dish (on top of gun) - MUCH LARGER
-        g2d.setColor(Color.WHITE);
-        int radarSize = 30; // Larger radar
-        g2d.setStroke(new BasicStroke(3)); // Thicker stroke
-        g2d.drawOval(-radarSize/2, -40, radarSize, radarSize); // Above gun
+        // MISSION 1: Radar as hollow circle or triangle (strict geometric)
+        // Positioned above gun (30px gun length + 5px gap = 35px from center)
+        int radarRadius = 8; // Small hollow circle
+        int radarY = -35; // Position above gun
+        
+        // MISSION 2: Use team color for radar
+        Color teamColor = determineTeamColor();
+        
+        // Draw radar as hollow circle (no fill, just outline)
+        g2d.setColor(teamColor);
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.drawOval(-radarRadius, radarY - radarRadius, radarRadius * 2, radarRadius * 2);
+        
+        // Draw small triangle indicator pointing in scan direction (hollow)
+        int[] xPoints = {-4, 0, 4};
+        int[] yPoints = {radarY - radarRadius - 6, radarY - radarRadius - 12, radarY - radarRadius - 6};
+        g2d.drawPolygon(xPoints, yPoints, 3);
+        
+        // MISSION 3: NO scan arc visualization - prevents ghosting
+        // Only the radar dish is drawn, no transient scan effects
         
         g2d.setTransform(old); // RESET TRANSFORM
+    }
+    
+    /**
+     * MISSION 2: Determine team color based on robot name.
+     * Duck -> CYAN (Blue), Snail -> RED, fallback to assigned color.
+     */
+    private Color determineTeamColor()
+    {
+        String name = getName().toLowerCase();
+        if (name.contains("duck")) {
+            return Color.CYAN;
+        } else if (name.contains("snail")) {
+            return Color.RED;
+        }
+        // Fallback to assigned color
+        return getColor();
     }
 }
 

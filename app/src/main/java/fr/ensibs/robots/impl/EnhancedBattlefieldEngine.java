@@ -44,6 +44,13 @@ public class EnhancedBattlefieldEngine
     private ScheduledFuture<?> scheduledFuture;
     private final ScheduledExecutorService scheduler;
     
+    // MISSION B: Game phase management
+    private GamePhaseManager phaseManager;
+    
+    // NUCLEAR OPTION: Debug output
+    private int tickCount = 0;
+    private int lastDebugOutput = 0;
+    
     /**
      * Constructor
      * 
@@ -59,6 +66,23 @@ public class EnhancedBattlefieldEngine
         this.battlefieldImpl = (BattlefieldImpl) battlefield;
         this.period = period;
         this.scheduler = Executors.newScheduledThreadPool(1);
+        
+        // MISSION B: Initialize phase manager
+        this.phaseManager = new GamePhaseManager();
+        
+        // Set up phase transition callbacks
+        phaseManager.setOnDeploymentEnd(() -> {
+            System.out.println(">>> COMBAT PHASE BEGINS! <<<");
+        });
+        phaseManager.setOnSkirmishEnd(() -> {
+            System.out.println(">>> ZONE BEGINS SHRINKING! <<<");
+        });
+        phaseManager.setOnPressureEnd(() -> {
+            System.out.println(">>> SUDDEN DEATH! <<<");
+        });
+        
+        // Pass phase manager to battlefield
+        battlefieldImpl.setPhaseManager(phaseManager);
     }
     
     /**
@@ -104,25 +128,66 @@ public class EnhancedBattlefieldEngine
      */
     private void runGameLoop()
     {
+        tickCount++;
+        
+        // NUCLEAR OPTION: Debug output every 60 ticks (1 second at 60 FPS)
+        if (tickCount - lastDebugOutput > 60) {
+            int aliveCount = battlefieldImpl.getActiveRobotCount();
+            int bulletCount = battlefieldImpl.getBulletCount();
+            System.out.println("=== TICK " + tickCount + " ===");
+            System.out.println("Alive robots: " + aliveCount);
+            System.out.println("Active bullets: " + bulletCount);
+            lastDebugOutput = tickCount;
+        }
+        
+        // Step 0: MISSION B - Update game phase manager
+        phaseManager.update();
+        
+        // Step 0.5: MISSION A.4 - Reset movement/firing flags for passive regeneration tracking
+        battlefieldImpl.applyPassiveRegeneration();
+        
         // Step 1: Update bullets and detect bullet vs robot collisions
         battlefieldImpl.detectCollisions();
         
         // Step 2: Decrease gun heats
         battlefieldImpl.decreaseGunHeats();
         
-        // Step 3: Remove dead robots (energy <= 0)
+        // Step 3: MISSION B - Update battle zone with phase-based shrinking
+        battlefieldImpl.updateBattleZone();
+        
+        // Step 4: MISSION B - Apply bleed damage in sudden death
+        if (phaseManager.getBleedDamagePerTick() > 0) {
+            battlefieldImpl.applyBleedDamage(phaseManager.getBleedDamagePerTick());
+        }
+        
+        // Step 5: MISSION 3.2 - Update energy capsules and check for collection
+        battlefieldImpl.updateEnergyCapsules();
+        
+        // Step 6: Remove dead robots (energy <= 0)
         battlefieldImpl.removeDeadRobots();
         
-        // Step 4: Process team messages (droids react to leader commands)
+        // Step 7: Process team messages (droids react to leader commands)
         battlefieldImpl.processTeamMessages();
         
-        // Step 5: Execute robot tasks in random order (only for alive robots)
+        // Step 8: Execute robot tasks in random order (only for alive robots)
         Collections.shuffle(tasks, RANDOM);
         for (RobotTask<? extends Robot> task : tasks) {
             if (task.getRobot().getEnergy() > 0) {
                 task.run();
             }
         }
+        
+        // Step 9: MISSION A.4 - Apply passive regeneration after all robot actions
+        battlefieldImpl.processPassiveRegeneration();
+    }
+    
+    /**
+     * MISSION B: Get the phase manager for UI access.
+     * 
+     * @return the phase manager
+     */
+    public GamePhaseManager getPhaseManager() {
+        return phaseManager;
     }
     
     /**

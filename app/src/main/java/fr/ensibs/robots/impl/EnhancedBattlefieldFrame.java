@@ -39,13 +39,13 @@ public class EnhancedBattlefieldFrame extends JFrame
         super("BATTLEFIELD_TERMINAL // LIVE");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
-        // Global dark sci-fi theme
-        getContentPane().setBackground(new Color(26, 26, 26)); // #1A1A1A
+        // Dark terminal theme
+        getContentPane().setBackground(new Color(13, 13, 13));
         
         JPanel mainPanel = new JPanel(new BorderLayout(5, 5));
         setContentPane(mainPanel);
         mainPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
-        mainPanel.setBackground(new Color(26, 26, 26)); // #1A1A1A Dark Grey
+        mainPanel.setBackground(new Color(13, 13, 13));
 
         // shared list of robots views and battlefield
         List<DroidView<? extends Droid>> views = new ArrayList<>();
@@ -100,6 +100,12 @@ public class EnhancedBattlefieldFrame extends JFrame
                     // Update visual effects
                     panel.syncBullets(battlefield);
                     panel.updateParticles();
+                    
+                    // MISSION 4.2: Check for kill streak announcements
+                    String announcement = panel.getAndClearLastKillAnnouncement();
+                    if (announcement != null) {
+                        dashboard.addKillStreakAnnouncement(announcement);
+                    }
                     
                     // Update dashboard
                     dashboard.update(views);

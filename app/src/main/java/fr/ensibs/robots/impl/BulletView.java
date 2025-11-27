@@ -4,7 +4,8 @@ import fr.ensibs.robots.logic.Location;
 // import fr.ensibs.robots.view.IDrawable; // TODO: Uncomment when api module is built
 
 import java.awt.*;
-import java.awt.geom.Ellipse2D;
+import java.awt.Composite;
+import java.awt.AlphaComposite;
 
 /**
  * Graphical representation of a bullet (tracer).
@@ -37,7 +38,9 @@ public class BulletView // implements IDrawable
     }
     
     /**
-     * Draw the bullet on the battlefield with enhanced tracer trail.
+     * MISSION F: Enhanced bullet rendering with colored trails and glow.
+     * OPERATION SNIPER - Draw bullet as a line representing its velocity.
+     * Makes bullets clearly visible as straight lines connecting robots.
      * 
      * @param g2d the graphics context
      */
@@ -47,67 +50,44 @@ public class BulletView // implements IDrawable
             return;
         }
         
-        Location location = bullet.getLocation();
-        int power = bullet.getPower();
-        
-        // Bullet size scales with power
-        double size = 3.0 + (power * 0.4);
-        double radius = size / 2.0;
-        
-        double heading = Math.toRadians(bullet.getHeading());
-        double trailLength = 15.0 + (power * 0.5); // Longer trail for higher power
-        
-        // Draw fading trail (multiple segments for smooth fade)
-        for (int i = 3; i >= 0; i--) {
-            double segmentLength = trailLength * (i + 1) / 4.0;
-            double segDx = Math.sin(heading) * segmentLength;
-            double segDy = -Math.cos(heading) * segmentLength;
+        Graphics2D gCopy = (Graphics2D) g2d.create();
+        try {
+            // Get bullet position and velocity
+            double x = bullet.getX();
+            double y = bullet.getY();
+            double velocityX = bullet.getVelocityX();
+            double velocityY = bullet.getVelocityY();
+            double speed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
             
-            float alpha = 0.3f + (0.7f * i / 3.0f);
-            Color trailColor = new Color(
-                tracerColor.getRed(),
-                tracerColor.getGreen(),
-                tracerColor.getBlue(),
-                (int) (alpha * 200)
-            );
+            // Normalize velocity for trail direction
+            double nx = speed > 0.001 ? velocityX / speed : 0;
+            double ny = speed > 0.001 ? velocityY / speed : 0;
             
-            g2d.setColor(trailColor);
-            g2d.setStroke(new BasicStroke(2.0f - (i * 0.3f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2d.drawLine(
-                location.getX(),
-                location.getY(),
-                (int) Math.round(location.getX() - segDx),
-                (int) Math.round(location.getY() - segDy)
-            );
+            // CRITICAL FIX: Limit trail length to prevent accumulation
+            // Trail length based on speed, but capped to prevent long trails
+            double trailLength = Math.min(30, speed * 1.5); // Max 30 pixels
+            
+            // MISSION F: Determine color by team (default to cyan for team 0, orange for team 1)
+            Color bulletColor = new Color(0, 255, 255); // Cyan default
+            // Could be improved by tracking bullet owner's team
+            
+            // NUCLEAR OPTION: Simple bullet rendering - just a circle and short line
+            // Simple circle for bullet
+            gCopy.setColor(Color.YELLOW);
+            gCopy.fillOval((int)(x - 4), (int)(y - 4), 8, 8);
+            
+            // Simple short trail (just a line, no stored history)
+            if (speed > 0.001) {
+                int trailX = (int)(x - nx * 15); // Fixed 15 pixel trail
+                int trailY = (int)(y - ny * 15);
+                
+                gCopy.setColor(Color.ORANGE);
+                gCopy.setStroke(new BasicStroke(2));
+                gCopy.drawLine((int)x, (int)y, trailX, trailY);
+            }
+        } finally {
+            gCopy.dispose();
         }
-        
-        // Draw bright core (glowing circle)
-        Shape bulletShape = new Ellipse2D.Double(
-            location.getX() - radius,
-            location.getY() - radius,
-            size,
-            size);
-        
-        // Outer glow
-        g2d.setColor(new Color(tracerColor.getRed(), tracerColor.getGreen(), 
-                              tracerColor.getBlue(), 100));
-        g2d.fill(new Ellipse2D.Double(
-            location.getX() - radius - 2,
-            location.getY() - radius - 2,
-            size + 4,
-            size + 4));
-        
-        // Bright core
-        g2d.setColor(tracerColor);
-        g2d.fill(bulletShape);
-        
-        // White hot center
-        g2d.setColor(Color.WHITE);
-        g2d.fill(new Ellipse2D.Double(
-            location.getX() - radius / 2,
-            location.getY() - radius / 2,
-            size / 2,
-            size / 2));
     }
     
     /**

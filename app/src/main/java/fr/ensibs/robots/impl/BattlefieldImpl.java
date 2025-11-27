@@ -10,6 +10,8 @@ import fr.ensibs.robots.logic.Location;
 import fr.ensibs.robots.logic.Robot;
 // import fr.ensibs.robots.logic.ScanResult; // TODO: Uncomment when api module is built
 
+import java.awt.Color;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -34,7 +36,46 @@ class BattlefieldImpl implements Battlefield
 {
     private final List<BaseDroid> robots = new CopyOnWriteArrayList<>();
     private final List<Bullet> bullets = new CopyOnWriteArrayList<>();
+    private final List<RobotWreckage> wreckages = new CopyOnWriteArrayList<>(); // MISSION 2.3: Persistent debris
+    private final List<EnergyCapsule> energyCapsules = new CopyOnWriteArrayList<>(); // MISSION 3.2: Energy drops
+    private final BattleZone battleZone = new BattleZone(); // MISSION 3.1: Shrinking zone
+    private final DamageTracker damageTracker = new DamageTracker(); // MISSION 4.2: Damage tracking
+    
+    // MISSION F: Damage number manager
+    private final DamageNumberManager damageNumberManager = new DamageNumberManager();
+    
+    // MISSION B: Phase manager reference
+    private GamePhaseManager phaseManager;
+    
+    // MISSION 5.1: Object pooling for bullets
+    private final ObjectPool<Bullet> bulletPool = new ObjectPool<>(() -> new Bullet(), 50, 200);
+    
     private final Random random = new Random();
+    
+    // PHASE 4: Visual effects event tracking
+    static class HitEvent
+    {
+        final Location location;
+        final Color color;
+        HitEvent(Location loc, Color c) { location = loc; color = c; }
+    }
+    private final List<HitEvent> recentHits = new ArrayList<>();
+    private Location lastMuzzleFlashLocation;
+    private double lastMuzzleFlashHeading;
+    
+    // MISSION 2.1: Camera shake event tracking
+    static class DamageEvent
+    {
+        final int damage;
+        final boolean isDeath;
+        final BaseDroid killer; // MISSION 4.2: Track killer for kill feed
+        DamageEvent(int dmg, boolean death, BaseDroid killer) { 
+            damage = dmg; 
+            isDeath = death;
+            this.killer = killer;
+        }
+    }
+    private final List<DamageEvent> recentDamageEvents = new ArrayList<>();
 
     void register(BaseDroid droid)
     {
@@ -82,6 +123,52 @@ class BattlefieldImpl implements Battlefield
     {
         return random.nextDouble() * 360.0;
     }
+    
+    /**
+     * MISSION B.4: Spawn a team on a specific side of the battlefield.
+     * 
+     * @param teamRobots list of robots to spawn
+     * @param side 0 for left side, 1 for right side
+     */
+    void spawnTeamOnSide(List<BaseDroid> teamRobots, int side)
+    {
+        int fieldWidth = BattleSetup.FIELD_WIDTH;
+        int fieldHeight = BattleSetup.FIELD_HEIGHT;
+        int margin = 100; // Stay away from edges
+        
+        if (teamRobots.isEmpty()) {
+            return;
+        }
+        
+        // Team spawns on LEFT side (side 0) or RIGHT side (side 1)
+        int teamX;
+        double heading;
+        if (side == 0) {
+            // Left side, face right (toward enemy)
+            teamX = margin + 50;
+            heading = 0; // Face right (East)
+        } else {
+            // Right side, face left (toward enemy)
+            teamX = fieldWidth - margin - 50;
+            heading = 180; // Face left (West)
+        }
+        
+        // Distribute robots vertically
+        int spacing = (fieldHeight - 2 * margin) / (teamRobots.size() + 1);
+        for (int i = 0; i < teamRobots.size(); i++) {
+            BaseDroid robot = teamRobots.get(i);
+            int y = margin + spacing * (i + 1);
+            Location spawnLoc = new Location(teamX, y);
+            robot.setLocation(spawnLoc);
+            // Set heading by rotating from current heading
+            double currentHeading = robot.getHeading();
+            double delta = heading - currentHeading;
+            // Normalize to shortest rotation
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+            robot.turnRobot(delta);
+        }
+    }
 
     private boolean isFree(Location candidate)
     {
@@ -125,11 +212,11 @@ class BattlefieldImpl implements Battlefield
      * Calculate the energy recovery (life steal) for the shooter when a bullet hits.
      * 
      * @param power the bullet power
-     * @return the energy recovery amount (3 × power)
+     * @return the energy recovery amount (5 × power)
      */
     public static int calculateLifeSteal(int power)
     {
-        return 3 * power;
+        return 5 * power;
     }
     
     /**
@@ -158,32 +245,46 @@ class BattlefieldImpl implements Battlefield
     @Override
     public void fire(Droid robot, int firePower) throws GunOverheatedException, ExhaustedException
     {
+        // MISSION B: Check if robots can fire in current phase
+        if (phaseManager != null && !phaseManager.canRobotsFire()) {
+            throw new GunOverheatedException(999); // Use as "not allowed" signal
+        }
+        
         BaseDroid shooter = requireDroid(robot);
         int power = Math.max(0, Math.min(BattleSetup.MAX_FIRE_POWER, firePower));
         if (power == 0) {
             return; // No-op for zero power
         }
-        if (shooter.getGunHeat() > 1) {
+        // NUCLEAR OPTION: Relaxed gun heat check - allow shooting even with some heat
+        if (shooter.getGunHeat() > 50) { // Was 1 - now much more lenient
             throw new GunOverheatedException(shooter.getGunHeat());
         }
         shooter.consumeEnergy(power);
         shooter.increaseGunHeat(calculateGunHeat(power));
         
-        // Create bullet entity
-        Location startLocation = shooter.getLocation();
+        // PHASE 1: Spawn bullet at gun barrel tip, not robot center
+        // Calculate barrel tip position based on gun heading
+        Location robotLocation = shooter.getLocation();
         double gunHeading = shooter.getGunHeading();
-        Bullet bullet = new Bullet(shooter, power, startLocation, gunHeading);
+        double gunHeadingRad = Math.toRadians(gunHeading);
+        
+        // Gun barrel length: ROBOT_RADIUS + gun extension (35px total from center)
+        double barrelLength = BattleSetup.ROBOT_RADIUS + 25.0; // 10 + 25 = 35px total
+        double barrelTipX = robotLocation.getX() + (barrelLength * Math.sin(gunHeadingRad));
+        double barrelTipY = robotLocation.getY() - (barrelLength * Math.cos(gunHeadingRad)); // Negative because Y increases downward
+        
+        Location barrelTipLocation = new Location((int) Math.round(barrelTipX), (int) Math.round(barrelTipY));
+        
+        // MISSION 5.1: Use object pool instead of new Bullet()
+        Bullet bullet = bulletPool.acquire();
+        bullet.init(shooter, power, barrelTipLocation, gunHeading);
         bullets.add(bullet);
         
-        // Check for immediate hit (instant hit-scan for now)
-        // In future missions, bullets will travel over time
-        BaseDroid target = findTarget(shooter);
-        if (target != null) {
-            int damage = calculateDamage(power);
-            target.adjustEnergy(-damage);
-            shooter.adjustEnergy(calculateLifeSteal(power));
-            bullet.deactivate(); // Bullet hit, deactivate it
-        }
+        // PHASE 4: Track muzzle flash location for visual effects
+        lastMuzzleFlashLocation = barrelTipLocation;
+        lastMuzzleFlashHeading = gunHeading;
+        
+        // PHASE 2: Removed instant hit-scan - bullets now travel and collide naturally via updateBullets()
     }
     
     /**
@@ -194,6 +295,57 @@ class BattlefieldImpl implements Battlefield
     List<Bullet> getBullets()
     {
         return new ArrayList<>(bullets);
+    }
+    
+    /**
+     * MISSION D: Get all bullets within a radius of a point.
+     * Used for robot bullet detection.
+     * 
+     * @param x the X coordinate
+     * @param y the Y coordinate
+     * @param radius the radius in pixels
+     * @return list of nearby bullets
+     */
+    public List<Bullet> getBulletsNear(double x, double y, double radius) {
+        List<Bullet> nearby = new ArrayList<>();
+        for (Bullet bullet : bullets) {
+            if (!bullet.isActive()) continue;
+            Location bulletLoc = bullet.getLocation();
+            double dist = Math.sqrt(Math.pow(bulletLoc.getX() - x, 2) + Math.pow(bulletLoc.getY() - y, 2));
+            if (dist <= radius) {
+                nearby.add(bullet);
+            }
+        }
+        return nearby;
+    }
+    
+    /**
+     * PHASE 4: Get recent hit events for visual effects (impact particles).
+     * Clears the list after returning.
+     * 
+     * @return list of hit events
+     */
+    List<HitEvent> getAndClearRecentHits()
+    {
+        List<HitEvent> hits = new ArrayList<>(recentHits);
+        recentHits.clear();
+        return hits;
+    }
+    
+    /**
+     * PHASE 4: Get last muzzle flash location and heading for visual effects.
+     * Returns null if no flash occurred since last call.
+     * 
+     * @return array [location, heading] or null
+     */
+    Object[] getAndClearLastMuzzleFlash()
+    {
+        if (lastMuzzleFlashLocation == null) {
+            return null;
+        }
+        Object[] result = new Object[]{lastMuzzleFlashLocation, lastMuzzleFlashHeading};
+        lastMuzzleFlashLocation = null;
+        return result;
     }
     
     /**
@@ -224,28 +376,96 @@ class BattlefieldImpl implements Battlefield
     {
         bullets.removeIf(bullet -> {
             if (!bullet.isActive()) {
+                // MISSION 5.1: Return bullet to pool
+                bulletPool.release(bullet);
                 return true; // Remove inactive bullets
             }
             boolean stillActive = bullet.update();
             if (!stillActive) {
+                // MISSION 5.1: Return bullet to pool
+                bulletPool.release(bullet);
                 return true; // Remove bullets that went out of bounds or exceeded range
             }
-            // Check for collisions with robots (Bullet vs Robot)
+            // PHASE 2: Check for collisions with robots using bounding box intersection
             Location bulletLoc = bullet.getLocation();
+            // Bullet bounding box: small square around bullet position
+            int bulletSize = 3; // Bullet radius
+            Rectangle bulletRect = new Rectangle(
+                bulletLoc.getX() - bulletSize, 
+                bulletLoc.getY() - bulletSize,
+                bulletSize * 2, 
+                bulletSize * 2
+            );
+            
             for (BaseDroid robot : robots) {
                 if (robot == bullet.getOwner() || robot.getEnergy() <= 0) {
                     continue; // Skip owner and dead robots
                 }
-                double distSq = distanceSquared(bulletLoc, robot.getLocation());
-                double collisionDistSq = BattleSetup.ROBOT_RADIUS * BattleSetup.ROBOT_RADIUS;
-                if (distSq <= collisionDistSq) {
+                
+                // Robot bounding box: square centered on robot
+                Location robotLoc = robot.getLocation();
+                int robotSize = BattleSetup.ROBOT_RADIUS;
+                Rectangle robotRect = new Rectangle(
+                    robotLoc.getX() - robotSize,
+                    robotLoc.getY() - robotSize,
+                    robotSize * 2,
+                    robotSize * 2
+                );
+                
+                // PHASE 2: Use bounding box intersection for collision detection
+                if (bulletRect.intersects(robotRect)) {
                     // Bullet hit robot - apply damage and life steal
                     int damage = calculateDamage(bullet.getPower());
+                    int energyBefore = robot.getEnergy();
                     robot.adjustEnergy(-damage);
-                    bullet.getOwner().adjustEnergy(calculateLifeSteal(bullet.getPower()));
+                    int energyAfter = robot.getEnergy();
+                    boolean isDeath = energyAfter <= 0 && energyBefore > 0;
+                    
+                    BaseDroid attacker = bullet.getOwner();
+                    attacker.adjustEnergy(calculateLifeSteal(bullet.getPower()));
+                    
+                    // NUCLEAR OPTION: Debug output for hits
+                    String attackerName = attacker.getClass().getSimpleName();
+                    String victimName = robot.getClass().getSimpleName();
+                    System.out.println("HIT! " + attackerName + " -> " + victimName + " for " + damage + " damage! (Energy: " + energyAfter + "/" + energyBefore + ")");
+                    
+                    if (isDeath) {
+                        System.out.println("KILLED! " + victimName + " is dead!");
+                    }
+                    
+                    // MISSION F: Add floating damage number
+                    damageNumberManager.addDamage(bulletLoc.getX(), bulletLoc.getY(), damage);
+                    
+                    // MISSION 4.2: Track damage dealt
+                    damageTracker.recordDamage(attacker, damage);
+                    
+                    // MISSION 4.2: Track kill (kill streak is tracked internally, announcements handled by caller)
+                    if (isDeath) {
+                        damageTracker.recordKill(attacker);
+                    }
+                    
+                    // PHASE 4: Track hit event for visual effects (impact particles)
+                    Color hitColor = Color.ORANGE; // Default hit color
+                    recentHits.add(new HitEvent(bulletLoc, hitColor));
+                    
+                    // MISSION 2.1: Track damage for camera shake (>10 damage or death)
+                    // MISSION 4.2: Include killer info for kill feed
+                    if (damage > 10 || isDeath) {
+                        recentDamageEvents.add(new DamageEvent(damage, isDeath, attacker));
+                    }
+                    
                     bullet.deactivate();
+                    // MISSION 5.1: Return bullet to pool
+                    bulletPool.release(bullet);
                     return true; // Remove bullet
                 }
+            }
+            
+            // PHASE 4: Check for wall hits (out of bounds) - spawn impact particles
+            if (bulletLoc.getX() < 0 || bulletLoc.getX() > BattleSetup.FIELD_WIDTH ||
+                bulletLoc.getY() < 0 || bulletLoc.getY() > BattleSetup.FIELD_HEIGHT) {
+                // Bullet hit wall - create wall impact effect
+                recentHits.add(new HitEvent(bulletLoc, Color.GRAY));
             }
             return false; // Keep bullet active
         });
@@ -253,6 +473,7 @@ class BattlefieldImpl implements Battlefield
     
     /**
      * Remove all dead robots (energy <= 0) from the battlefield.
+     * MISSION 2.3: Creates wreckage instead of just removing robots.
      * This should be called each game loop iteration after collision detection.
      * 
      * @return the number of robots removed
@@ -260,8 +481,206 @@ class BattlefieldImpl implements Battlefield
     int removeDeadRobots()
     {
         int sizeBefore = robots.size();
-        robots.removeIf(robot -> robot.getEnergy() <= 0);
+                // MISSION 2.1: Track deaths for camera shake
+                // MISSION 2.3: Create wreckage for dead robots
+                robots.removeIf(robot -> {
+                    boolean isDead = robot.getEnergy() <= 0;
+                    if (isDead) {
+                        // Track death event for camera shake (no killer for natural deaths)
+                        recentDamageEvents.add(new DamageEvent(100, true, null)); // 100 = death intensity
+                
+                // MISSION 4.2: Reset kill streak when robot dies
+                damageTracker.resetKillStreak(robot);
+                
+                // MISSION 2.3: Create wreckage from dead robot
+                Location deathLocation = robot.getLocation();
+                double bodyHeading = robot.getHeading();
+                double gunHeading = robot.getGunHeading();
+                
+                // Determine team color (default to gray if unknown)
+                Color teamColor = Color.GRAY;
+                // Try to get color from view if available (this is a simplified approach)
+                // In a full implementation, you'd pass the view/color info here
+                
+                RobotWreckage wreckage = new RobotWreckage(deathLocation, teamColor, bodyHeading, gunHeading);
+                wreckages.add(wreckage);
+                
+                // MISSION 3.2: Spawn energy capsule at death location
+                EnergyCapsule capsule = new EnergyCapsule(deathLocation);
+                energyCapsules.add(capsule);
+            }
+            return isDead;
+        });
         return sizeBefore - robots.size();
+    }
+    
+    /**
+     * MISSION 2.3: Get all wreckage on the battlefield.
+     * 
+     * @return list of wreckage (dead robots that remain on field)
+     */
+    List<RobotWreckage> getWreckages()
+    {
+        return new ArrayList<>(wreckages);
+    }
+    
+    /**
+     * MISSION 2.3: Update all wreckage (for spark timing).
+     */
+    void updateWreckages()
+    {
+        for (RobotWreckage wreckage : wreckages) {
+            wreckage.update();
+        }
+    }
+    
+    /**
+     * MISSION B: Set the phase manager for phase-based game mechanics.
+     * 
+     * @param phaseManager the phase manager
+     */
+    void setPhaseManager(GamePhaseManager phaseManager) {
+        this.phaseManager = phaseManager;
+    }
+    
+    /**
+     * MISSION B: Get the phase manager for UI access.
+     * 
+     * @return the phase manager, or null if not set
+     */
+    public GamePhaseManager getPhaseManager() {
+        return phaseManager;
+    }
+    
+    /**
+     * MISSION F: Get the damage number manager for UI rendering.
+     * 
+     * @return the damage number manager
+     */
+    public DamageNumberManager getDamageNumberManager() {
+        return damageNumberManager;
+    }
+    
+    /**
+     * MISSION 3.1: Update battle zone and apply damage to robots outside zone.
+     * MISSION B: Now uses phase-based shrinking.
+     * Should be called each game tick.
+     */
+    void updateBattleZone()
+    {
+        // MISSION B: Use phase-based zone shrinking
+        if (phaseManager != null && phaseManager.isZoneShrinking()) {
+            double shrinkRate = phaseManager.getZoneShrinkRate();
+            battleZone.shrink(shrinkRate);
+        } else {
+            // Fallback to time-based (for compatibility)
+            battleZone.update(System.currentTimeMillis());
+        }
+        
+        // Apply zone damage to robots outside the safe zone
+        for (BaseDroid robot : robots) {
+            if (robot.getEnergy() > 0) {
+                int zoneDamage = battleZone.getZoneDamage(robot.getLocation());
+                if (zoneDamage > 0) {
+                    robot.adjustEnergy(-zoneDamage);
+                }
+            }
+        }
+    }
+    
+    /**
+     * MISSION B: Apply bleed damage to all robots in sudden death phase.
+     * 
+     * @param damagePerTick the damage amount per tick
+     */
+    void applyBleedDamage(double damagePerTick) {
+        for (BaseDroid robot : robots) {
+            if (robot.getEnergy() > 0) {
+                robot.adjustEnergy(-(int)Math.ceil(damagePerTick));
+            }
+        }
+    }
+    
+    /**
+     * MISSION 3.1: Get the battle zone.
+     * 
+     * @return the battle zone
+     */
+    BattleZone getBattleZone()
+    {
+        return battleZone;
+    }
+    
+    /**
+     * MISSION 3.2: Update energy capsules and check for collection.
+     * Should be called each game tick.
+     */
+    void updateEnergyCapsules()
+    {
+        // Update capsules
+        for (EnergyCapsule capsule : energyCapsules) {
+            capsule.update();
+        }
+        
+        // Check for collection by robots
+        for (BaseDroid robot : robots) {
+            if (robot.getEnergy() > 0) {
+                Location robotLoc = robot.getLocation();
+                for (EnergyCapsule capsule : energyCapsules) {
+                    if (capsule.canBeCollected(robotLoc)) {
+                        int energyGained = capsule.collect();
+                        robot.adjustEnergy(energyGained);
+                    }
+                }
+            }
+        }
+        
+        // Remove collected capsules
+        energyCapsules.removeIf(EnergyCapsule::isCollected);
+    }
+    
+    /**
+     * MISSION 3.2: Get all energy capsules on the battlefield.
+     * 
+     * @return list of energy capsules
+     */
+    List<EnergyCapsule> getEnergyCapsules()
+    {
+        return new ArrayList<>(energyCapsules);
+    }
+    
+    /**
+     * MISSION 4.2: Get the damage tracker.
+     * 
+     * @return the damage tracker
+     */
+    DamageTracker getDamageTracker()
+    {
+        return damageTracker;
+    }
+    
+    /**
+     * MISSION 4.2: Get kill streak for kill feed announcements.
+     * Should be called when a kill occurs.
+     * 
+     * @param killer the robot that got the kill
+     * @return kill streak count
+     */
+    int getKillStreak(Droid killer)
+    {
+        return damageTracker.getKillStreak(killer);
+    }
+    
+    /**
+     * MISSION 2.1: Get and clear recent damage events for camera shake.
+     * 
+     * @return list of damage events (damage amount and whether it was a death)
+     */
+    List<DamageEvent> getAndClearRecentDamageEvents()
+    {
+        List<DamageEvent> events = new ArrayList<>(recentDamageEvents);
+        recentDamageEvents.clear();
+        return events;
     }
     
     /**
@@ -277,6 +696,18 @@ class BattlefieldImpl implements Battlefield
     }
     
     /**
+     * NUCLEAR OPTION: Get count of active bullets for debug output.
+     * 
+     * @return the number of active bullets
+     */
+    int getBulletCount()
+    {
+        return (int) bullets.stream()
+            .filter(bullet -> bullet.isActive())
+            .count();
+    }
+    
+    /**
      * Process team messages for all droids.
      * This should be called each game loop iteration after leader tasks run
      * but before individual robot tasks.
@@ -286,6 +717,38 @@ class BattlefieldImpl implements Battlefield
         for (BaseDroid droid : robots) {
             if (droid.getEnergy() > 0) {
                 droid.processMessages();
+            }
+        }
+    }
+    
+    /**
+     * MISSION A.4: Apply passive energy regeneration to robots.
+     * Robots gain +1 energy per tick when NOT moving and NOT firing.
+     * Should be called at the start of each game tick (before robot actions).
+     */
+    void applyPassiveRegeneration()
+    {
+        // Reset flags for all robots at the start of the tick
+        for (BaseDroid robot : robots) {
+            robot.resetTickFlags();
+        }
+        
+        // Regeneration is applied at the end of the tick (after all actions)
+        // This is handled in a separate method called after robot actions
+    }
+    
+    /**
+     * MISSION A.4: Process passive regeneration after robot actions.
+     * Should be called at the end of each game tick (after robot actions).
+     */
+    void processPassiveRegeneration()
+    {
+        for (BaseDroid robot : robots) {
+            if (robot.getEnergy() > 0) {
+                // Only regenerate if robot didn't move and didn't fire
+                if (!robot.isMoving() && !robot.hasFiredThisTick()) {
+                    robot.addEnergy(1);
+                }
             }
         }
     }

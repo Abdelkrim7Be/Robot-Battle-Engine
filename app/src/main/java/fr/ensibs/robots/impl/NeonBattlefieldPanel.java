@@ -30,18 +30,29 @@ import static fr.ensibs.robots.logic.BattleSetup.FIELD_WIDTH;
 public class NeonBattlefieldPanel extends BattlefieldPanel
 {
     // Dark sci-fi theme colors
-    private static final Color BACKGROUND_DARK = new Color(13, 13, 13); // #0D0D0D Near Black
-    private static final Color GRID_NEON = new Color(0, 50, 0, 80); // Dark green radar grid
-    private static final Color BORDER_NEON = new Color(51, 51, 51); // #333333 Dark gray border
-    private static final Color BORDER_GLOW = new Color(0, 100, 0, 50); // Subtle green glow
+    private static final Color BACKGROUND_DARK = new Color(0, 0, 0); // Pure black for maximum contrast
+    private static final Color GRID_NEON = new Color(0, 100, 0, 120); // Bright green grid
+    private static final Color BORDER_NEON = new Color(0, 150, 0); // Bright green border
     
     private static final int GRID_SIZE = 50;
     
+    // CRITICAL: Store direct reference to views list (shared with ControlsPanel)
+    private final List<DroidView<? extends Droid>> viewsList;
+    
     // Visual effects
     private final List<Object> additionalDrawables;
-    private final ParticleSystem particleSystem;
+    // NUCLEAR OPTION: DISABLED - Particle system causing spirals
+    // private final ParticleSystem particleSystem;
     private final MuzzleFlashSystem muzzleFlashSystem;
     private final DamageFlashSystem damageFlashSystem;
+    private final CameraShaker cameraShaker; // MISSION 2.1: Screen shake
+    private final AutoDirector autoDirector; // MISSION 4.1: Smart camera
+    
+    // Battlefield reference for wreckage access
+    private fr.ensibs.robots.logic.Battlefield battlefieldRef; // MISSION 2.3: For wreckage access
+    
+    // MISSION 4.2: Kill feed announcements
+    private String lastKillAnnouncement; // Last kill streak announcement
     
     // Rendering optimization
     private long lastFrameTime = System.nanoTime();
@@ -53,10 +64,15 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     public NeonBattlefieldPanel(List<DroidView<? extends Droid>> views)
     {
         super(views);
+        // CRITICAL: Store direct reference to the shared views list
+        this.viewsList = views;
         this.additionalDrawables = new ArrayList<>();
-        this.particleSystem = new ParticleSystem();
+        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
+        // this.particleSystem = new ParticleSystem();
         this.muzzleFlashSystem = new MuzzleFlashSystem();
         this.damageFlashSystem = new DamageFlashSystem();
+        this.cameraShaker = new CameraShaker(); // MISSION 2.1: Screen shake
+        this.autoDirector = new AutoDirector(); // MISSION 4.1: Smart camera
         
         setDoubleBuffered(true);
         setBackground(BACKGROUND_DARK);
@@ -65,17 +81,14 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     @Override
     protected void paintComponent(Graphics g)
     {
-        // CRITICAL FIX: Do NOT call super.paintComponent() - it draws robots on white background!
-        // We handle everything ourselves with correct order
-        
+        // PART 1: THE RENDERING ENGINE - Clean, centered view with simple geometry
         Graphics2D g2d = (Graphics2D) g;
         
-        // STEP 1: WIPE - Clear screen FIRST (fixes ghosting)
-        int panelWidth = getWidth();
-        int panelHeight = getHeight();
+        // 1. CLEAR THE SCREEN
+        int width = getWidth();
+        int height = getHeight();
         g2d.setColor(Color.BLACK);
-        g2d.clearRect(0, 0, panelWidth, panelHeight);
-        g2d.fillRect(0, 0, panelWidth, panelHeight);
+        g2d.fillRect(0, 0, width, height);
         
         // Calculate FPS
         long currentTime = System.nanoTime();
@@ -89,61 +102,63 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
         
-        // Compute scale and margins for coordinate transformation
-        double scale = Math.min(panelWidth * 1.0d / FIELD_WIDTH, panelHeight * 1.0d / FIELD_HEIGHT);
-        double marginX = (panelWidth - FIELD_WIDTH * scale) / 2;
-        double marginY = (panelHeight - FIELD_HEIGHT * scale) / 2;
+        // Calculate center offsets (0.9 scale for padding)
+        double scale = Math.min(width * 1.0 / FIELD_WIDTH, height * 1.0 / FIELD_HEIGHT) * 0.9;
+        int xOffset = (int) ((width - (FIELD_WIDTH * scale)) / 2);
+        int yOffset = (int) ((height - (FIELD_HEIGHT * scale)) / 2);
         
-        // Save original transform
-        AffineTransform originalTransform = g2d.getTransform();
-        
-        // Apply battlefield coordinate transform
-        g2d.setTransform(new AffineTransform(scale, 0, 0, scale, marginX, marginY));
-        
-        // STEP 2: Clear battlefield area (dark background)
-        g2d.setColor(BACKGROUND_DARK);
-        g2d.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
-        
-        // STEP 3: GRID - Draw grid lines (dark green)
-        drawDigitalGrid(g2d);
-        
-        // STEP 4: BORDERS
-        drawDangerZoneBorders(g2d);
-        
-        // STEP 5: ENTITIES - Draw robots (BEFORE bullets)
-        // DEBUG: Log robot positions for diagnostic
-        List<DroidView<? extends Droid>> debugViews = getViews();
-        if (!debugViews.isEmpty()) {
-            System.out.printf("[RENDER_DEBUG] Frame: %d robots, scale=%.3f, margin=(%.1f,%.1f)%n", 
-                debugViews.size(), scale, marginX, marginY);
-            for (DroidView<? extends Droid> view : debugViews) {
-                Location loc = view.getRobot().getLocation();
-                double screenX = loc.getX() * scale + marginX;
-                double screenY = loc.getY() * scale + marginY;
-                System.out.printf("[RENDER_DEBUG] %s: LogicPos(%d,%d) -> ScreenPos(%.1f,%.1f) | Energy=%d | Color=%s%n",
-                    view.getName(), loc.getX(), loc.getY(), screenX, screenY, 
-                    view.getRobot().getEnergy(), view.getColor());
+        // Apply global transform: Translate then Scale
+        Graphics2D battlefieldG = (Graphics2D) g2d.create();
+        try {
+            battlefieldG.translate(xOffset, yOffset);
+            battlefieldG.scale(scale, scale);
+            
+            // Draw Green Grid border
+            battlefieldG.setColor(new Color(0, 150, 0)); // Bright green
+            battlefieldG.setStroke(new BasicStroke(2.0f));
+            battlefieldG.drawRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
+            
+            // Draw grid lines
+            battlefieldG.setColor(new Color(0, 50, 0)); // Dark green
+            battlefieldG.setStroke(new BasicStroke(1.0f));
+            for (int i = 0; i <= FIELD_WIDTH; i += 50) {
+                battlefieldG.drawLine(i, 0, i, FIELD_HEIGHT);
             }
+            for (int i = 0; i <= FIELD_HEIGHT; i += 50) {
+                battlefieldG.drawLine(0, i, FIELD_WIDTH, i);
+            }
+            
+            // Draw entities with strict isolation
+            drawRobotsClean(battlefieldG);
+            drawBulletsClean(battlefieldG);
+            
+            // MISSION F: Draw damage numbers
+            if (battlefieldRef instanceof BattlefieldImpl) {
+                BattlefieldImpl impl = (BattlefieldImpl) battlefieldRef;
+                DamageNumberManager dnm = impl.getDamageNumberManager();
+                if (dnm != null) {
+                    dnm.update();
+                    dnm.draw(battlefieldG);
+                }
+            }
+        } finally {
+            battlefieldG.dispose();
         }
-        drawRobots(g2d);
         
-        // STEP 6: Bullets
-        drawAdditionalEntities(g2d);
-        
-        // Restore transform for screen-space drawing
-        g2d.setTransform(originalTransform);
-        
-        // STEP 7: UI OVERLAY - Draw FPS counter (last)
+        // Draw FPS counter (screen coordinates)
         drawFPS(g2d);
+        
+        // MISSION B: Draw phase indicator
+        drawPhaseIndicator(g2d);
     }
     
     /**
-     * Draw the digital grid overlay (radar-style dark green).
+     * Draw the digital grid overlay (radar-style bright green).
      */
     private void drawDigitalGrid(Graphics2D g2d)
     {
         g2d.setColor(GRID_NEON);
-        g2d.setStroke(new BasicStroke(0.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         
         // Draw vertical lines
         for (int x = 0; x <= FIELD_WIDTH; x += GRID_SIZE) {
@@ -157,108 +172,428 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     }
     
     /**
-     * Draw danger zone borders (dark gray).
+     * Draw danger zone borders (bright green).
      */
     private void drawDangerZoneBorders(Graphics2D g2d)
     {
-        // Main border
+        // Main border - bright green for visibility
         g2d.setColor(BORDER_NEON);
-        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.setStroke(new BasicStroke(3.0f));
         g2d.drawRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
     }
     
     /**
-     * Draw robots - STRICT ORDER: Save transform, translate, rotate, draw, restore.
-     * CRITICAL: Each robot must save/restore transform to prevent corruption.
+     * MISSION 3.1: Draw the shrinking battle zone (red border).
+     * 
+     * @param g2d the graphics context
      */
-    private void drawRobots(Graphics2D g2d)
+    private void drawBattleZone(Graphics2D g2d)
+    {
+        if (battlefieldRef == null || !(battlefieldRef instanceof BattlefieldImpl)) {
+            return;
+        }
+        BattlefieldImpl impl = (BattlefieldImpl) battlefieldRef;
+        BattleZone zone = impl.getBattleZone();
+        
+        if (!zone.isZoneActive()) {
+            return; // Zone not active yet
+        }
+        
+        Location center = zone.getZoneCenter();
+        double radius = zone.getZoneRadius();
+        
+        // Draw red border circle (danger zone)
+        g2d.setColor(new Color(255, 0, 0, 200)); // Red, semi-transparent
+        g2d.setStroke(new BasicStroke(4.0f));
+        g2d.drawOval(
+            (int)(center.getX() - radius),
+            (int)(center.getY() - radius),
+            (int)(radius * 2),
+            (int)(radius * 2)
+        );
+        
+        // Draw pulsing inner glow for extra visibility
+        g2d.setColor(new Color(255, 0, 0, 50)); // Very transparent red
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.drawOval(
+            (int)(center.getX() - radius - 5),
+            (int)(center.getY() - radius - 5),
+            (int)((radius + 5) * 2),
+            (int)((radius + 5) * 2)
+        );
+    }
+    
+    /**
+     * ---------------------------------------------------------
+     * START OF HARDCODED RENDERER
+     * ---------------------------------------------------------
+     * HARD RESET: Vector graphics renderer - no glow, no particles, pure geometry
+     * COMPLETELY REPLACES view.draw() system
+     */
+    /**
+     * PART 1: Draw robots with clean, simple geometry (squares and rectangles).
+     * No glows, no effects - just crisp shapes for debugging.
+     */
+    private void drawRobotsClean(Graphics2D battlefieldG)
     {
         List<DroidView<? extends Droid>> views = getViews();
         
-        // ALWAYS draw test robot at center for visibility check
-        drawTestRobot(g2d, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
-        
-        // Draw all robots
         for (DroidView<? extends Droid> view : views) {
-            if (view.getRobot().getEnergy() > 0) {
-                // CRITICAL: Save transform before drawing each robot
-                AffineTransform savedTransform = g2d.getTransform();
+            Droid robot = view.getRobot();
+            
+            // Skip dead robots
+            if (robot.getEnergy() <= 0) {
+                continue;
+            }
+            
+            // Determine color
+            Color teamColor = Color.YELLOW;
+            String name = view.getName().toLowerCase();
+            if (name.contains("duck")) {
+                teamColor = Color.CYAN;
+            } else if (name.contains("snail")) {
+                teamColor = Color.RED;
+            }
+            
+            Location loc = robot.getLocation();
+            int x = loc.getX();
+            int y = loc.getY();
+            
+            // Create isolated Graphics copy for THIS robot
+            Graphics2D gRobot = (Graphics2D) battlefieldG.create();
+            try {
+                // Translate to robot position
+                gRobot.translate(x, y);
                 
+                // Rotate by body heading (convert North->East)
+                double bodyHeading = robot.getHeading();
+                gRobot.rotate(Math.toRadians(bodyHeading - 90));
+                
+                // Draw Body: Filled Rectangle at (0,0) after translate
+                gRobot.setColor(teamColor);
+                gRobot.fillRect(-20, -20, 40, 40); // Body
+                gRobot.setColor(Color.BLACK);
+                gRobot.drawRect(-20, -20, 40, 40); // Outline
+                
+                // Reset rotation for gun
+                gRobot.setTransform(battlefieldG.getTransform());
+                gRobot.translate(x, y);
+                double gunHeading = robot.getGunHeading();
+                gRobot.rotate(Math.toRadians(gunHeading - 90));
+                
+                // Draw Gun: Rectangle at (0,0) after translate
+                gRobot.setColor(Color.WHITE);
+                gRobot.setStroke(new BasicStroke(3.0f));
+                gRobot.drawLine(0, 0, 35, 0); // Gun barrel
+            } finally {
+                gRobot.dispose();
+            }
+            
+            // MISSION F: Draw health bar above robot
+            drawHealthBar(battlefieldG, robot, x, y);
+        }
+    }
+    
+    /**
+     * MISSION F: Draw health bar above robot
+     */
+    private void drawHealthBar(Graphics2D g, Droid robot, int x, int y) {
+        // Estimate max energy (1500 for robots, 2500 for droids)
+        double maxEnergy = 1500; // Default
+        String name = robot.getClass().getSimpleName().toLowerCase();
+        if (name.contains("droid")) {
+            maxEnergy = 2500;
+        }
+        
+        double healthPercent = robot.getEnergy() / maxEnergy;
+        
+        int barWidth = 40;
+        int barHeight = 4;
+        int barX = x - barWidth / 2;
+        int barY = y - 35; // Above robot
+        
+        // Background
+        g.setColor(new Color(50, 50, 50));
+        g.fillRect(barX, barY, barWidth, barHeight);
+        
+        // Health portion
+        Color healthColor;
+        if (healthPercent > 0.6) {
+            healthColor = Color.GREEN;
+        } else if (healthPercent > 0.3) {
+            healthColor = Color.YELLOW;
+        } else {
+            healthColor = Color.RED;
+        }
+        
+        g.setColor(healthColor);
+        g.fillRect(barX, barY, (int)(barWidth * healthPercent), barHeight);
+        
+        // Border
+        g.setColor(Color.WHITE);
+        g.drawRect(barX, barY, barWidth, barHeight);
+    }
+    
+    /**
+     * PART 1: Draw bullets with clean, simple geometry (circles only).
+     * No trails, no glows - just yellow circles.
+     */
+    private void drawBulletsClean(Graphics2D battlefieldG)
+    {
+        if (battlefieldRef == null || !(battlefieldRef instanceof BattlefieldImpl)) {
+            return;
+        }
+        BattlefieldImpl impl = (BattlefieldImpl) battlefieldRef;
+        List<Bullet> bullets = impl.getBullets();
+        
+        for (Bullet bullet : bullets) {
+            if (!bullet.isActive()) {
+                continue;
+            }
+            
+            Location loc = bullet.getLocation();
+            int x = loc.getX();
+            int y = loc.getY();
+            
+            // Create isolated Graphics copy for THIS bullet
+            Graphics2D gBullet = (Graphics2D) battlefieldG.create();
+            try {
+                // Translate to bullet position
+                gBullet.translate(x, y);
+                
+                // Draw simple yellow circle at (0,0) after translate
+                gBullet.setColor(Color.YELLOW);
+                gBullet.fillOval(-2, -2, 4, 4); // Radius 4px circle
+            } finally {
+                gBullet.dispose();
+            }
+        }
+    }
+    
+    /**
+     * SNAPSHOT PATTERN: Draw robots with strict Graphics isolation.
+     * Each robot gets its own Graphics copy from the camera Graphics.
+     */
+    private void drawRobots(Graphics2D cameraG)
+    {
+        List<DroidView<? extends Droid>> views = getViews();
+        
+        // SNAPSHOT PATTERN: Each robot gets its own Graphics copy
+        for (DroidView<? extends Droid> view : views) {
+            Droid robot = view.getRobot();
+            
+            // Skip dead robots
+            if (robot.getEnergy() <= 0) {
+                continue;
+            }
+            
+            // A. DETERMINE COLOR (Hardcoded Team Logic)
+            Color teamColor = Color.YELLOW; // Default
+            String name = view.getName();
+            
+            String nameLower = name.toLowerCase();
+            if (nameLower.contains("duck")) {
+                teamColor = Color.CYAN; // Blue Team
+            } else if (nameLower.contains("snail")) {
+                teamColor = Color.RED;  // Red Team
+            }
+            
+            Location loc = robot.getLocation();
+            int x = loc.getX();
+            int y = loc.getY();
+            
+            // SNAPSHOT PATTERN: Create isolated Graphics copy for THIS robot only
+            Graphics2D gRobot = (Graphics2D) cameraG.create();
+            try {
+                // Move ONLY the copy to robot position
+                gRobot.translate(x, y);
+                
+                // Draw body (at 0,0 because we translated the context)
+                double bodyHeading = robot.getHeading();
+                gRobot.rotate(Math.toRadians(bodyHeading - 90)); // Convert North->East
+                gRobot.setColor(teamColor);
+                gRobot.setStroke(new BasicStroke(3));
+                gRobot.drawRect(-20, -20, 40, 40); // Outline at (0,0) relative to robot
+                gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 200));
+                gRobot.fillRect(-20, -20, 40, 40); // Fill at (0,0)
+                
+                // Reset rotation for gun
+                gRobot.setTransform(cameraG.getTransform());
+                gRobot.translate(x, y);
+                
+                // Draw gun (at 0,0 because we translated)
+                double gunHeading = robot.getGunHeading();
+                gRobot.rotate(Math.toRadians(gunHeading - 90));
+                gRobot.setColor(Color.WHITE);
+                gRobot.setStroke(new BasicStroke(3));
+                gRobot.drawLine(0, 0, 35, 0); // Draw at (0,0) after translate
+                
+                // Draw radar if applicable
+                if (robot instanceof fr.ensibs.robots.logic.Robot robotWithRadar) {
+                    gRobot.setTransform(cameraG.getTransform());
+                    gRobot.translate(x, y);
+                    double radarHeading = robotWithRadar.getRadarHeading();
+                    gRobot.rotate(Math.toRadians(radarHeading - 90));
+                    gRobot.setColor(Color.GREEN);
+                    gRobot.setStroke(new BasicStroke(2));
+                    gRobot.drawOval(-10, -10, 20, 20); // Draw at (0,0) after translate
+                }
+                
+                // Draw glow (at 0,0 because we translated)
+                gRobot.setTransform(cameraG.getTransform());
+                gRobot.translate(x, y);
+                int glowRadius = 30;
+                float[] fractions = {0.0f, 0.5f, 1.0f};
+                Color[] glowColors = {
+                    new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 30),
+                    new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 15),
+                    new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 0)
+                };
+                java.awt.geom.Point2D glowCenter = new java.awt.geom.Point2D.Float(0, 0);
+                java.awt.RadialGradientPaint robotGlow = new java.awt.RadialGradientPaint(
+                    glowCenter, glowRadius, fractions, glowColors
+                );
+                gRobot.setPaint(robotGlow);
+                gRobot.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER));
+                gRobot.fillOval(-glowRadius, -glowRadius, glowRadius * 2, glowRadius * 2);
+            } finally {
+                // CRITICAL: Dispose copy - the 'pen' resets to origin
+                gRobot.dispose();
+            }
+        }
+    }
+    
+    /**
+     * SNAPSHOT PATTERN: Draw additional entities (bullets) with strict Graphics isolation.
+     * Each bullet gets its own Graphics copy from the camera Graphics.
+     */
+    private void drawAdditionalEntities(Graphics2D cameraG)
+    {
+        // CRITICAL: Remove inactive bullets immediately to prevent accumulation
+        additionalDrawables.removeIf(drawable -> {
+            if (drawable instanceof BulletView) {
+                BulletView bulletView = (BulletView) drawable;
+                return !bulletView.isVisible(); // Remove if not visible
+            }
+            return false;
+        });
+        
+        // SNAPSHOT PATTERN: Each bullet gets its own Graphics copy
+        for (Object drawable : new ArrayList<>(additionalDrawables)) {
+            if (drawable instanceof BulletView) {
+                BulletView bulletView = (BulletView) drawable;
+                // SNAPSHOT PATTERN: Create isolated Graphics copy for THIS bullet
+                Graphics2D gBullet = (Graphics2D) cameraG.create();
                 try {
-                    // Draw robot (view handles its own transforms)
-                    view.draw(g2d);
+                    // BulletView.draw() will translate to bullet position and draw at (0,0)
+                    bulletView.draw(gBullet);
                 } finally {
-                    // ALWAYS restore transform to prevent corruption
-                    g2d.setTransform(savedTransform);
+                    // CRITICAL: Dispose copy
+                    gBullet.dispose();
+                }
+            } else {
+                // Fallback for other drawables
+                try {
+                    java.lang.reflect.Method drawMethod = drawable.getClass().getMethod("draw", Graphics2D.class);
+                    Graphics2D gDrawable = (Graphics2D) cameraG.create();
+                    try {
+                        drawMethod.invoke(drawable, gDrawable);
+                    } finally {
+                        gDrawable.dispose();
+                    }
+                } catch (Exception e) {
+                    // Skip if draw method doesn't exist
                 }
             }
         }
     }
     
     /**
-     * Draw a test robot at specified coordinates to verify rendering pipeline.
-     * ALWAYS draw this to ensure robots are visible.
-     */
-    private void drawTestRobot(Graphics2D g2d, int x, int y)
-    {
-        AffineTransform original = g2d.getTransform();
-        g2d.translate(x, y);
-        
-        // Draw HUGE bright red test robot (high visibility)
-        int size = 80; // Very large
-        g2d.setColor(Color.RED);
-        g2d.fillRect(-size/2, -size/2, size, size);
-        g2d.setColor(Color.WHITE);
-        g2d.setStroke(new BasicStroke(4.0f));
-        g2d.drawRect(-size/2, -size/2, size, size);
-        
-        // Draw a cross to mark center
-        g2d.setColor(Color.YELLOW);
-        g2d.setStroke(new BasicStroke(3.0f));
-        g2d.drawLine(-size/2, 0, size/2, 0);
-        g2d.drawLine(0, -size/2, 0, size/2);
-        
-        g2d.setTransform(original);
-    }
-    
-    /**
-     * Draw additional entities (bullets, etc.).
-     */
-    private void drawAdditionalEntities(Graphics2D g2d)
-    {
-        for (Object drawable : new ArrayList<>(additionalDrawables)) {
-            try {
-                java.lang.reflect.Method drawMethod = drawable.getClass().getMethod("draw", Graphics2D.class);
-                drawMethod.invoke(drawable, g2d);
-            } catch (Exception e) {
-                // Skip if draw method doesn't exist
-            }
-        }
-    }
-    
-    /**
-     * Draw FPS counter (debug).
+     * Draw FPS counter (bright green terminal style).
      */
     private void drawFPS(Graphics2D g2d)
     {
-        g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        g2d.setColor(new Color(0, 255, 0)); // Bright green
+        g2d.setFont(new Font("Monospaced", Font.BOLD, 12));
         g2d.drawString(String.format("FPS: %.1f", currentFPS), 10, 20);
     }
     
     /**
-     * Get views list.
+     * MISSION B: Draw phase indicator at top center of screen.
      */
-    @SuppressWarnings("unchecked")
+    private void drawPhaseIndicator(Graphics2D g2d)
+    {
+        if (battlefieldRef == null || !(battlefieldRef instanceof BattlefieldImpl)) {
+            return;
+        }
+        
+        BattlefieldImpl impl = (BattlefieldImpl) battlefieldRef;
+        GamePhaseManager pm = impl.getPhaseManager();
+        if (pm == null) {
+            return;
+        }
+        
+        String phaseText = pm.getPhaseDisplayName();
+        int remaining = pm.getRemainingSecondsInPhase();
+        
+        // Choose color based on phase
+        Color phaseColor;
+        switch (pm.getCurrentPhase()) {
+            case DEPLOYMENT:
+                phaseColor = Color.CYAN;
+                break;
+            case SKIRMISH:
+                phaseColor = Color.GREEN;
+                break;
+            case PRESSURE:
+                phaseColor = Color.ORANGE;
+                break;
+            case SUDDEN_DEATH:
+                phaseColor = Color.RED;
+                break;
+            default:
+                phaseColor = Color.WHITE;
+        }
+        
+        // Draw phase name
+        g2d.setFont(new Font("Monospaced", Font.BOLD, 24));
+        
+        String displayText = phaseText;
+        if (remaining > 0) {
+            displayText += " - " + remaining + "s";
+        }
+        
+        FontMetrics fm = g2d.getFontMetrics();
+        int textWidth = fm.stringWidth(displayText);
+        int x = (getWidth() - textWidth) / 2;
+        int y = 40;
+        
+        // Draw background
+        g2d.setColor(new Color(0, 0, 0, 150));
+        g2d.fillRect(x - 10, y - 20, textWidth + 20, 30);
+        
+        // Draw text
+        g2d.setColor(phaseColor);
+        g2d.drawString(displayText, x, y);
+        
+        // If deployment, show countdown
+        if (pm.getCurrentPhase() == GamePhaseManager.Phase.DEPLOYMENT) {
+            String subText = "Combat begins in " + remaining + " seconds";
+            g2d.setFont(new Font("Monospaced", Font.PLAIN, 14));
+            fm = g2d.getFontMetrics();
+            int subWidth = fm.stringWidth(subText);
+            g2d.setColor(Color.WHITE);
+            g2d.drawString(subText, (getWidth() - subWidth) / 2, y + 25);
+        }
+    }
+    
+    /**
+     * Get views list - use direct reference instead of reflection.
+     */
     private List<DroidView<? extends Droid>> getViews()
     {
-        try {
-            java.lang.reflect.Field viewsField = BattlefieldPanel.class.getDeclaredField("views");
-            viewsField.setAccessible(true);
-            return (List<DroidView<? extends Droid>>) viewsField.get(this);
-        } catch (Exception e) {
-            return new ArrayList<>();
-        }
+        // Use direct reference stored in constructor
+        return viewsList != null ? viewsList : new ArrayList<>();
     }
     
     // Public API methods
@@ -280,6 +615,9 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     public void syncBullets(fr.ensibs.robots.logic.Battlefield battlefield)
     {
+        // MISSION 2.3: Store battlefield reference for wreckage access
+        this.battlefieldRef = battlefield;
+        
         if (!(battlefield instanceof BattlefieldImpl)) {
             return;
         }
@@ -287,6 +625,40 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         
         additionalDrawables.removeIf(d -> d instanceof BulletView);
         
+        // PHASE 4: Process visual effects events
+        // Muzzle flash
+        Object[] muzzleFlash = impl.getAndClearLastMuzzleFlash();
+        if (muzzleFlash != null) {
+            Location flashLoc = (Location) muzzleFlash[0];
+            Double flashHeading = (Double) muzzleFlash[1];
+            createMuzzleFlash(flashLoc, flashHeading);
+        }
+        
+        // NUCLEAR OPTION: DISABLED - Impact particles causing spirals
+        // List<BattlefieldImpl.HitEvent> hits = impl.getAndClearRecentHits();
+        // for (BattlefieldImpl.HitEvent hit : hits) {
+        //     createHitEffect(hit.location, hit.color);
+        // }
+        
+        // MISSION 2.1: Process damage events for camera shake
+        // MISSION 4.2: Also check for kill streaks for announcer
+        List<BattlefieldImpl.DamageEvent> damageEvents = impl.getAndClearRecentDamageEvents();
+        for (BattlefieldImpl.DamageEvent event : damageEvents) {
+            int intensity = event.isDeath ? 100 : event.damage;
+            triggerCameraShake(intensity);
+            
+            // MISSION 4.2: Kill streak announcements (stored for dashboard access)
+            if (event.isDeath && event.killer != null) {
+                int killStreak = impl.getKillStreak(event.killer);
+                String announcement = getKillStreakAnnouncement(killStreak);
+                if (announcement != null) {
+                    // Store for dashboard to retrieve
+                    lastKillAnnouncement = announcement;
+                }
+            }
+        }
+        
+        // CRITICAL FIX: Only add ACTIVE bullets to prevent accumulation
         List<Bullet> bullets = impl.getBullets();
         for (Bullet bullet : bullets) {
             if (bullet.isActive()) {
@@ -294,13 +666,120 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 additionalDrawables.add(bulletView);
             }
         }
+        
+        // CRITICAL: Clean up inactive bullets immediately
+        additionalDrawables.removeIf(d -> {
+            if (d instanceof BulletView) {
+                return !((BulletView) d).isVisible();
+            }
+            return false;
+        });
+        
+        // MISSION 2.3: Update wreckage (for spark timing)
+        impl.updateWreckages();
     }
     
+    /**
+     * SNAPSHOT PATTERN: Draw all wreckage with strict Graphics isolation.
+     * 
+     * @param cameraG the camera Graphics context
+     */
+    private void drawWreckages(Graphics2D cameraG)
+    {
+        if (battlefieldRef == null || !(battlefieldRef instanceof BattlefieldImpl)) {
+            return;
+        }
+        BattlefieldImpl impl = (BattlefieldImpl) battlefieldRef;
+        List<RobotWreckage> wreckages = impl.getWreckages();
+        
+        // SNAPSHOT PATTERN: Each wreckage gets its own Graphics copy
+        for (RobotWreckage wreckage : wreckages) {
+            Graphics2D gWreckage = (Graphics2D) cameraG.create();
+            try {
+                wreckage.draw(gWreckage);
+            } finally {
+                gWreckage.dispose();
+            }
+        }
+    }
+    
+    /**
+     * SNAPSHOT PATTERN: Draw all energy capsules with strict Graphics isolation.
+     * 
+     * @param cameraG the camera Graphics context
+     */
+    private void drawEnergyCapsules(Graphics2D cameraG)
+    {
+        if (battlefieldRef == null || !(battlefieldRef instanceof BattlefieldImpl)) {
+            return;
+        }
+        BattlefieldImpl impl = (BattlefieldImpl) battlefieldRef;
+        List<EnergyCapsule> capsules = impl.getEnergyCapsules();
+        
+        // SNAPSHOT PATTERN: Each capsule gets its own Graphics copy
+        for (EnergyCapsule capsule : capsules) {
+            Graphics2D gCapsule = (Graphics2D) cameraG.create();
+            try {
+                capsule.draw(gCapsule);
+            } finally {
+                gCapsule.dispose();
+            }
+        }
+    }
+    
+    /**
+     * Update particles and visual effects.
+     * CRITICAL: Must be called every frame to prevent accumulation.
+     */
     public void updateParticles()
     {
-        particleSystem.update();
+        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
+        // particleSystem.update();
         muzzleFlashSystem.update();
         damageFlashSystem.update();
+        // Camera shake is updated in paintComponent() for frame-perfect timing
+    }
+    
+    /**
+     * MISSION 2.1: Trigger camera shake for damage or death.
+     * 
+     * @param intensity the damage amount (use 100 for death)
+     */
+    public void triggerCameraShake(int intensity)
+    {
+        cameraShaker.triggerShake(intensity);
+    }
+    
+    /**
+     * MISSION 4.2: Get kill streak announcement text.
+     * 
+     * @param killStreak the kill streak count
+     * @return announcement text or null if no special announcement
+     */
+    private String getKillStreakAnnouncement(int killStreak)
+    {
+        if (killStreak == 2) {
+            return "DOUBLE KILL";
+        } else if (killStreak == 3) {
+            return "TRIPLE KILL";
+        } else if (killStreak == 4) {
+            return "QUADRA KILL";
+        } else if (killStreak >= 5) {
+            return "PENTA KILL";
+        }
+        return null;
+    }
+    
+    /**
+     * MISSION 4.2: Get and clear the last kill announcement.
+     * 
+     * @return the announcement text or null
+     */
+    public String getAndClearLastKillAnnouncement()
+    {
+        String announcement = lastKillAnnouncement;
+        lastKillAnnouncement = null;
+        return announcement;
     }
     
     public void createMuzzleFlash(fr.ensibs.robots.logic.Location location, double heading)
@@ -310,12 +789,14 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     public void createHitEffect(fr.ensibs.robots.logic.Location location, Color color)
     {
-        particleSystem.createHit(location, color);
+        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
+        // particleSystem.createHit(location, color);
     }
     
     public void createExplosion(fr.ensibs.robots.logic.Location location, Color color, int intensity)
     {
-        particleSystem.createExplosion(location, color, intensity);
+        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
+        // particleSystem.createExplosion(location, color, intensity);
     }
     
     public void registerDamageFlash(Droid droid)
@@ -325,7 +806,8 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     public ParticleSystem getParticleSystem()
     {
-        return particleSystem;
+        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
+        return null; // particleSystem;
     }
 }
 

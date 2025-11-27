@@ -25,11 +25,12 @@ import fr.ensibs.robots.logic.Location;
  */
 class Bullet
 {
-    private final BaseDroid owner; // The robot that fired this bullet
-    private final int power; // The power/damage of this bullet
-    private final double heading; // Direction in degrees (0-360)
-    private final double velocityX; // X component of velocity vector
-    private final double velocityY; // Y component of velocity vector
+    // MISSION 5.1: Changed from final to allow object pooling
+    private BaseDroid owner; // The robot that fired this bullet
+    private int power; // The power/damage of this bullet
+    private double heading; // Direction in degrees (0-360)
+    private double velocityX; // X component of velocity vector
+    private double velocityY; // Y component of velocity vector
     
     private double x; // Current X position (double for smooth movement)
     private double y; // Current Y position (double for smooth movement)
@@ -43,14 +44,23 @@ class Bullet
     private static final double BASE_BULLET_SPEED = 20.0; // pixels per tick
     
     /**
-     * Constructor
+     * Default constructor for object pooling.
+     */
+    Bullet()
+    {
+        // Empty constructor for object pool
+    }
+    
+    /**
+     * Initialize bullet with values (for reuse from pool).
+     * MISSION 5.1: Object pooling support.
      * 
      * @param owner the robot that fired this bullet
      * @param power the bullet power
      * @param startLocation the starting location
      * @param heading the direction in degrees (0-360, where 0 = North)
      */
-    Bullet(BaseDroid owner, int power, Location startLocation, double heading)
+    void init(BaseDroid owner, int power, Location startLocation, double heading)
     {
         this.owner = owner;
         this.power = power;
@@ -66,6 +76,19 @@ class Bullet
         double radians = Math.toRadians(this.heading);
         this.velocityX = speed * Math.sin(radians);
         this.velocityY = -speed * Math.cos(radians); // Negative because Y increases downward
+    }
+    
+    /**
+     * Constructor (for backward compatibility, but uses init internally).
+     * 
+     * @param owner the robot that fired this bullet
+     * @param power the bullet power
+     * @param startLocation the starting location
+     * @param heading the direction in degrees (0-360, where 0 = North)
+     */
+    Bullet(BaseDroid owner, int power, Location startLocation, double heading)
+    {
+        init(owner, power, startLocation, heading);
     }
     
     /**
@@ -99,6 +122,26 @@ class Bullet
     }
     
     /**
+     * Get the current X coordinate (for rendering).
+     * 
+     * @return the X coordinate
+     */
+    double getX()
+    {
+        return x;
+    }
+    
+    /**
+     * Get the current Y coordinate (for rendering).
+     * 
+     * @return the Y coordinate
+     */
+    double getY()
+    {
+        return y;
+    }
+    
+    /**
      * Get the heading/direction of the bullet
      * 
      * @return the heading in degrees (0-360)
@@ -106,6 +149,26 @@ class Bullet
     double getHeading()
     {
         return heading;
+    }
+    
+    /**
+     * Get the X component of velocity vector.
+     * 
+     * @return velocity X in pixels per tick
+     */
+    double getVelocityX()
+    {
+        return velocityX;
+    }
+    
+    /**
+     * Get the Y component of velocity vector.
+     * 
+     * @return velocity Y in pixels per tick
+     */
+    double getVelocityY()
+    {
+        return velocityY;
     }
     
     /**
@@ -197,11 +260,11 @@ class Bullet
     /**
      * Calculate the energy recovery for the shooter when this bullet hits.
      * 
-     * @return the energy recovery amount (3 × power)
+     * @return the energy recovery amount (5 × power)
      */
     int calculateLifeSteal()
     {
-        return 3 * power;
+        return 5 * power;
     }
 }
 

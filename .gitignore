@@ -10,3 +10,10 @@ tasks/bin/
 # Documentation files (for personal reference only)
 *.md
 
+.idea/
+*.iml
+.vscode/
+*.class
+build/
+.gradle/
+out/

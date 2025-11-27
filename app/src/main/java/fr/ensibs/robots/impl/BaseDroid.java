@@ -102,6 +102,24 @@ class BaseDroid implements Droid
         adjustEnergy(-amount);
     }
 
+    /**
+     * Try to consume the given amount of energy without throwing.
+     *
+     * @param amount energy to consume
+     * @return {@code true} if energy was consumed, {@code false} otherwise
+     */
+    protected boolean tryConsumeEnergy(int amount)
+    {
+        if (amount <= 0) {
+            return true;
+        }
+        if (energy < amount) {
+            return false;
+        }
+        adjustEnergy(-amount);
+        return true;
+    }
+
     static double normalize(double value)
     {
         return Body.normalize(value);
@@ -159,6 +177,12 @@ class BaseDroid implements Droid
     @Override
     public void turnRobot(double degrees)
     {
+        if (Math.abs(degrees) < 1e-9) {
+            return;
+        }
+        if (!tryConsumeEnergy(BattleSetup.BODY_TURN_ENERGY)) {
+            return;
+        }
         // Rotate body - this returns the delta that was applied
         double bodyDelta = body.rotate(degrees);
         // Gun automatically follows body rotation
@@ -168,6 +192,12 @@ class BaseDroid implements Droid
     @Override
     public void turnGun(double degrees)
     {
+        if (Math.abs(degrees) < 1e-9) {
+            return;
+        }
+        if (!tryConsumeEnergy(BattleSetup.GUN_TURN_ENERGY)) {
+            return;
+        }
         // Gun rotates independently of body
         gun.rotate(degrees);
     }

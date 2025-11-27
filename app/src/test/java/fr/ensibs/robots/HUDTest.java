@@ -161,9 +161,15 @@ class HUDTest
         // Create leaderboard with top 5
         Leaderboard leaderboard = new Leaderboard(5);
         
-        // Verify it only shows top 5
-        assertEquals(5, leaderboard.getWidth(), // Just verify it exists
-            "Leaderboard should be created");
+        // Verify configured top count via reflection
+        try {
+            java.lang.reflect.Field field = Leaderboard.class.getDeclaredField("topCount");
+            field.setAccessible(true);
+            assertEquals(5, field.getInt(leaderboard),
+                "Leaderboard should respect the configured top count");
+        } catch (ReflectiveOperationException e) {
+            fail("Unable to inspect leaderboard configuration: " + e.getMessage());
+        }
     }
 
     /**

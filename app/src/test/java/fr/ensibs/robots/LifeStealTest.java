@@ -6,6 +6,7 @@ import fr.ensibs.robots.logic.CollisionException;
 import fr.ensibs.robots.logic.Droid;
 import fr.ensibs.robots.logic.ExhaustedException;
 import fr.ensibs.robots.logic.GunOverheatedException;
+import fr.ensibs.robots.logic.Location;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,8 +45,8 @@ class LifeStealTest
         Droid target = factory.makeDroid();
         
         // Position shooter and target
-        moveTo(shooter, 200, 150);
-        moveTo(target, 200, 200);
+        positionDroid(shooter, 200, 150);
+        positionDroid(target, 200, 200);
         
         // Aim shooter at target
         shooter.turnGun(180.0 - shooter.getGunHeading()); // Point gun South
@@ -55,6 +56,7 @@ class LifeStealTest
         
         // Fire at target
         shooter.fire(bulletPower);
+        stepBattlefield();
         
         int shooterEnergyAfter = shooter.getEnergy();
         
@@ -84,8 +86,8 @@ class LifeStealTest
         Droid target = factory.makeDroid();
         
         // Position shooter and target
-        moveTo(shooter, 200, 150);
-        moveTo(target, 200, 200);
+        positionDroid(shooter, 200, 150);
+        positionDroid(target, 200, 200);
         
         shooter.turnGun(180.0 - shooter.getGunHeading());
         
@@ -94,6 +96,7 @@ class LifeStealTest
         
         // Fire at target
         shooter.fire(bulletPower);
+        stepBattlefield();
         
         int shooterEnergyAfter = shooter.getEnergy();
         int energyGained = shooterEnergyAfter - (shooterEnergyBefore - bulletPower);
@@ -115,7 +118,7 @@ class LifeStealTest
         Droid shooter = factory.makeDroid();
         
         // Position shooter with no target in range
-        moveTo(shooter, 100, 100);
+        positionDroid(shooter, 100, 100);
         
         // Aim away from any potential targets
         shooter.turnGun(0.0 - shooter.getGunHeading()); // Point gun North
@@ -125,6 +128,7 @@ class LifeStealTest
         
         // Fire (should miss - no target)
         shooter.fire(bulletPower);
+        stepBattlefield();
         
         int shooterEnergyAfter = shooter.getEnergy();
         
@@ -144,8 +148,8 @@ class LifeStealTest
         Droid target = factory.makeDroid();
         
         // Position shooter and target
-        moveTo(shooter, 200, 150);
-        moveTo(target, 200, 200);
+        positionDroid(shooter, 200, 150);
+        positionDroid(target, 200, 200);
         
         shooter.turnGun(180.0 - shooter.getGunHeading());
         
@@ -154,11 +158,13 @@ class LifeStealTest
         int numberOfShots = 3;
         
         // Fire multiple times
-        for (int i = 0; i < numberOfShots; i++) {
+        int shotsLanded = 0;
+        while (shotsLanded < numberOfShots) {
             try {
                 shooter.fire(bulletPower);
+                stepBattlefield();
+                shotsLanded++;
             } catch (GunOverheatedException e) {
-                // Cool down gun
                 factory.makeBattlefield().decreaseGunHeats();
             }
         }
@@ -212,6 +218,31 @@ class LifeStealTest
                 // Stop if collision occurs
                 break;
             }
+        }
+    }
+
+    private void stepBattlefield()
+    {
+        fr.ensibs.robots.logic.Battlefield battlefield = factory.makeBattlefield();
+        try {
+            java.lang.reflect.Method method = battlefield.getClass().getDeclaredMethod("detectCollisions");
+            method.setAccessible(true);
+            for (int i = 0; i < 100; i++) {
+                method.invoke(battlefield);
+            }
+        } catch (ReflectiveOperationException e) {
+            fail("Unable to advance battlefield state: " + e.getMessage());
+        }
+    }
+    
+    private void positionDroid(Droid droid, int x, int y)
+    {
+        try {
+            java.lang.reflect.Method method = droid.getClass().getDeclaredMethod("setLocation", Location.class);
+            method.setAccessible(true);
+            method.invoke(droid, new Location(x, y));
+        } catch (ReflectiveOperationException e) {
+            fail("Unable to position robot: " + e.getMessage());
         }
     }
 }

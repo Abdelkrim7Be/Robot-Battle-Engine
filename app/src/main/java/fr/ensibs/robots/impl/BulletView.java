@@ -1,8 +1,5 @@
 package fr.ensibs.robots.impl;
 
-import fr.ensibs.robots.logic.Location;
-// import fr.ensibs.robots.view.IDrawable; // TODO: Uncomment when api module is built
-
 import java.awt.*;
 import java.awt.Composite;
 import java.awt.AlphaComposite;
@@ -12,12 +9,10 @@ import java.awt.AlphaComposite;
  * 
  * <p>Bullets are rendered as small, bright tracers that show their
  * trajectory. Higher power bullets are rendered larger and brighter.
- * 
- * <p>TODO: Implement IDrawable when api module is built.
- * 
+ *
  * @author Robot Wars Team
  */
-public class BulletView // implements IDrawable
+public class BulletView
 {
     private final Bullet bullet;
     private final Color tracerColor;

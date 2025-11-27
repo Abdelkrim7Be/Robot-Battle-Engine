@@ -6,6 +6,7 @@ import fr.ensibs.robots.logic.CollisionException;
 import fr.ensibs.robots.logic.Droid;
 import fr.ensibs.robots.logic.ExhaustedException;
 import fr.ensibs.robots.logic.GunOverheatedException;
+import fr.ensibs.robots.logic.Location;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +42,12 @@ class EnergyTest
     void testEnergyDecreasesAfterMove() throws CollisionException, ExhaustedException
     {
         Droid droid = factory.makeDroid();
+        try {
+            moveTo(droid, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+        } catch (CollisionException | ExhaustedException e) {
+            fail("Unexpected exception while positioning robot: " + e);
+        }
+        droid.turnRobot(90.0 - droid.getHeading());
         int initialEnergy = droid.getEnergy();
         
         // Move the droid
@@ -80,11 +87,17 @@ class EnergyTest
     void testExhaustedExceptionOnInsufficientEnergy()
     {
         Droid droid = factory.makeDroid();
+        try {
+            moveTo(droid, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+        } catch (CollisionException | ExhaustedException e) {
+            fail("Unexpected exception while positioning robot: " + e);
+        }
+        droid.turnRobot(90.0 - droid.getHeading());
         int initialEnergy = droid.getEnergy();
         
         // Consume almost all energy (leave just 1 point)
         // We'll need to move many times to drain energy
-        int movesToDrain = (initialEnergy - 1) / MOTION_ENERGY;
+        int movesToDrain = initialEnergy / MOTION_ENERGY;
         
         try {
             for (int i = 0; i < movesToDrain; i++) {
@@ -107,6 +120,12 @@ class EnergyTest
     void testEnergyCannotGoBelowZero() throws CollisionException, ExhaustedException
     {
         Droid droid = factory.makeDroid();
+        try {
+            moveTo(droid, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+        } catch (CollisionException | ExhaustedException e) {
+            fail("Unexpected exception while positioning robot: " + e);
+        }
+        droid.turnRobot(90.0 - droid.getHeading());
         int initialEnergy = droid.getEnergy();
         
         // Try to move many times (more than energy allows)
@@ -140,6 +159,10 @@ class EnergyTest
     {
         Droid droid1 = factory.makeDroid();
         Droid droid2 = factory.makeDroid();
+        positionDroid(droid1, FIELD_WIDTH / 2, FIELD_HEIGHT / 3);
+        positionDroid(droid2, FIELD_WIDTH / 2, FIELD_HEIGHT * 2 / 3);
+        droid1.turnRobot(90.0 - droid1.getHeading());
+        droid2.turnRobot(90.0 - droid2.getHeading());
         
         int energy1Before = droid1.getEnergy();
         int energy2Before = droid2.getEnergy();
@@ -217,6 +240,40 @@ class EnergyTest
         // Verify life steal formula
         assertEquals(9, expectedLifeSteal,
             "Life steal should be 3 × power = 9 for power=3");
+    }
+
+    private void moveTo(Droid droid, int x, int y) throws CollisionException, ExhaustedException
+    {
+        fr.ensibs.robots.logic.Battlefield battlefield = factory.makeBattlefield();
+        droid.turnRobot(90.0 - droid.getHeading());
+        while (droid.getLocation().getX() != x) {
+            int dx = x - droid.getLocation().getX();
+            int moveDistance = Math.max(MIN_DISTANCE_MOVE, Math.min(MAX_DISTANCE_MOVE, dx));
+            if (moveDistance == 0) {
+                break;
+            }
+            battlefield.move(droid, moveDistance);
+        }
+        droid.turnRobot(90.0);
+        while (droid.getLocation().getY() != y) {
+            int dy = y - droid.getLocation().getY();
+            int moveDistance = Math.max(MIN_DISTANCE_MOVE, Math.min(MAX_DISTANCE_MOVE, dy));
+            if (moveDistance == 0) {
+                break;
+            }
+            battlefield.move(droid, moveDistance);
+        }
+    }
+    
+    private void positionDroid(Droid droid, int x, int y)
+    {
+        try {
+            java.lang.reflect.Method method = droid.getClass().getDeclaredMethod("setLocation", Location.class);
+            method.setAccessible(true);
+            method.invoke(droid, new Location(x, y));
+        } catch (ReflectiveOperationException e) {
+            fail("Unable to position robot: " + e.getMessage());
+        }
     }
 }
 

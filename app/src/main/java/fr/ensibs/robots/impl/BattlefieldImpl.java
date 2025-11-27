@@ -8,7 +8,7 @@ import fr.ensibs.robots.logic.ExhaustedException;
 import fr.ensibs.robots.logic.GunOverheatedException;
 import fr.ensibs.robots.logic.Location;
 import fr.ensibs.robots.logic.Robot;
-// import fr.ensibs.robots.logic.ScanResult; // TODO: Uncomment when api module is built
+import fr.ensibs.robots.logic.TeamLeader;
 
 import java.awt.Color;
 import java.awt.Rectangle;
@@ -76,7 +76,10 @@ class BattlefieldImpl implements Battlefield
         }
     }
     private final List<DamageEvent> recentDamageEvents = new ArrayList<>();
-
+    
+    // DEBUG: Counter for move() calls (to limit logging)
+    private static int moveCallCount = 0;
+    
     void register(BaseDroid droid)
     {
         robots.add(droid);
@@ -180,6 +183,58 @@ class BattlefieldImpl implements Battlefield
         return true;
     }
 
+    /**
+     * Check if two robots are teammates.
+     * 
+     * @param robot1 first robot
+     * @param robot2 second robot
+     * @return true if they are teammates
+     */
+    private boolean areTeammates(BaseDroid robot1, BaseDroid robot2)
+    {
+        // Check if robot1 is a TeamLeader and robot2 is in its teammates list
+        if (robot1 instanceof TeamLeader leader1) {
+            for (Droid teammate : leader1.getTeammates()) {
+                if (teammate == robot2) {
+                    return true;
+                }
+            }
+        }
+        
+        // Check if robot2 is a TeamLeader and robot1 is in its teammates list
+        if (robot2 instanceof TeamLeader leader2) {
+            for (Droid teammate : leader2.getTeammates()) {
+                if (teammate == robot1) {
+                    return true;
+                }
+            }
+        }
+        
+        // Check if both are teammates of the same leader
+        // (two droids from the same team)
+        for (BaseDroid potentialLeader : robots) {
+            if (potentialLeader instanceof TeamLeader leader) {
+                boolean robot1IsTeammate = false;
+                boolean robot2IsTeammate = false;
+                
+                for (Droid teammate : leader.getTeammates()) {
+                    if (teammate == robot1) {
+                        robot1IsTeammate = true;
+                    }
+                    if (teammate == robot2) {
+                        robot2IsTeammate = true;
+                    }
+                }
+                
+                if (robot1IsTeammate && robot2IsTeammate) {
+                    return true; // Both are teammates of the same leader
+                }
+            }
+        }
+        
+        return false;
+    }
+    
     private static double distanceSquared(Location a, Location b)
     {
         double dx = a.getX() - b.getX();
@@ -212,11 +267,11 @@ class BattlefieldImpl implements Battlefield
      * Calculate the energy recovery (life steal) for the shooter when a bullet hits.
      * 
      * @param power the bullet power
-     * @return the energy recovery amount (5 × power)
+     * @return the energy recovery amount (3 × power)
      */
     public static int calculateLifeSteal(int power)
     {
-        return 5 * power;
+        return 3 * power;
     }
     
     /**
@@ -255,8 +310,7 @@ class BattlefieldImpl implements Battlefield
         if (power == 0) {
             return; // No-op for zero power
         }
-        // NUCLEAR OPTION: Relaxed gun heat check - allow shooting even with some heat
-        if (shooter.getGunHeat() > 50) { // Was 1 - now much more lenient
+        if (shooter.getGunHeat() > 1) {
             throw new GunOverheatedException(shooter.getGunHeat());
         }
         shooter.consumeEnergy(power);
@@ -400,6 +454,11 @@ class BattlefieldImpl implements Battlefield
             for (BaseDroid robot : robots) {
                 if (robot == bullet.getOwner() || robot.getEnergy() <= 0) {
                     continue; // Skip owner and dead robots
+                }
+                
+                // Check for friendly fire - skip if robots are teammates
+                if (areTeammates(bullet.getOwner(), robot)) {
+                    continue; // Skip teammates (no friendly fire)
                 }
                 
                 // Robot bounding box: square centered on robot
@@ -797,10 +856,21 @@ class BattlefieldImpl implements Battlefield
     @Override
     public void move(Droid robot, double distance) throws CollisionException, ExhaustedException
     {
+        // DEBUG: Log movement attempts (only for first few moves to avoid spam)
+        moveCallCount++;
+        if (moveCallCount <= 20 && distance != 0) {
+            System.out.println("[MOVE] move(" + distance + ") called on " + robot.getClass().getSimpleName() + " at " + robot.getLocation());
+        }
         BaseDroid mover = requireDroid(robot);
         double limitedDistance = Math.max(BattleSetup.MIN_DISTANCE_MOVE, Math.min(BattleSetup.MAX_DISTANCE_MOVE, distance));
         if (limitedDistance == 0) {
+            if (moveCallCount <= 20) {
+                System.out.println("[MOVE] Limited distance is 0, returning");
+            }
             return;
+        }
+        if (moveCallCount <= 20) {
+            System.out.println("[MOVE] Moving " + robot.getClass().getSimpleName() + " by " + limitedDistance + " pixels");
         }
         mover.consumeEnergy(BattleSetup.MOTION_ENERGY);
         Location start = mover.getLocation();
@@ -876,69 +946,6 @@ class BattlefieldImpl implements Battlefield
         return null;
     }
 
-    /**
-     * Perform a radar scan and return ScanResult objects with relative information.
-     * This method uses geometric field-of-view scanning to detect robots in a
-     * pie-slice shaped area centered on the radar's heading.
-     * 
-     * NOTE: This method is commented out until ScanResult class is available in the api module.
-     * Uncomment when api module is built and ScanResult is accessible.
-     * 
-     * @param robot the robot performing the scan
-     * @return a list of ScanResult objects containing distance and bearing for each detected robot
-     * @throws ExhaustedException if the robot has insufficient energy to scan
-     */
-    /*
-    public List<ScanResult> scanWithResults(Robot robot) throws ExhaustedException
-    {
-        RobotImpl scanner = requireRobot(robot);
-        scanner.consumeEnergy(BattleSetup.SCAN_ENERGY);
-        List<ScanTarget> targets = new ArrayList<>();
-        Location source = scanner.getLocation();
-        double heading = scanner.getRadarHeading();
-        double halfField = BattleSetup.VISION_FIELD / 2.0;
-        
-        // Scan all robots in the field of vision (pie slice)
-        for (BaseDroid candidate : robots) {
-            if (candidate == robot || candidate.getEnergy() <= 0) {
-                continue; // Skip self and eliminated robots
-            }
-            Location location = candidate.getLocation();
-            double bearing = calculateBearing(source, location);
-            double angleDiff = angleDifference(heading, bearing);
-            
-            // Check if robot is within the field of vision (pie slice)
-            if (angleDiff > halfField) {
-                continue; // Outside field of vision
-            }
-            
-            // Calculate distance
-            double distance = Math.hypot(location.getX() - source.getX(), location.getY() - source.getY());
-            
-            // Calculate lateral distance for occlusion checking
-            double lateral = distance * Math.sin(Math.toRadians(angleDiff));
-            int bucket = (int) Math.floor(Math.abs(lateral) / (2 * BattleSetup.ROBOT_RADIUS + 0.0001));
-            
-            targets.add(new ScanTarget(location, distance, bearing, bucket));
-        }
-        
-        // Sort by distance (closest first)
-        targets.sort(Comparator.comparingDouble(ScanTarget::distance));
-        
-        // Filter out occluded targets (only show closest in each lateral bucket)
-        Set<Integer> blockedBuckets = new HashSet<>();
-        List<ScanResult> results = new ArrayList<>();
-        for (ScanTarget target : targets) {
-            if (blockedBuckets.add(target.bucket())) {
-                // Create ScanResult with relative information only (prevents cheating)
-                results.add(new ScanResult(target.distance(), target.bearing()));
-            }
-        }
-        
-        return Collections.unmodifiableList(results);
-    }
-    */
-    
     @Override
     public List<Location> scan(Robot robot) throws ExhaustedException
     {
@@ -1027,6 +1034,18 @@ class BattlefieldImpl implements Battlefield
             throw new IllegalArgumentException("Unknown robot instance");
         }
         return base;
+    }
+    
+    /**
+     * Check if a robot is still registered on the battlefield.
+     * Used to validate robots before executing tasks.
+     * 
+     * @param robot the robot to check
+     * @return true if the robot is still on the battlefield, false otherwise
+     */
+    boolean isRobotRegistered(Robot robot)
+    {
+        return robot instanceof BaseDroid base && robots.contains(base);
     }
 
     private RobotImpl requireRobot(Robot robot)

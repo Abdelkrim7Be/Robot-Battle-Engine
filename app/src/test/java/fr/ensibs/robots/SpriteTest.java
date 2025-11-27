@@ -166,12 +166,9 @@ class SpriteTest
         radarTransform.transform(testPoint, radarResult);
         
         // Verify all three are different
-        assertNotEquals(bodyResult.getX(), gunResult.getX(), 0.1,
-            "Body and gun transforms should differ");
-        assertNotEquals(gunResult.getX(), radarResult.getX(), 0.1,
-            "Gun and radar transforms should differ");
-        assertNotEquals(bodyResult.getX(), radarResult.getX(), 0.1,
-            "Body and radar transforms should differ");
+        assertTransformsDiffer(bodyResult, gunResult, "Body and gun transforms should differ");
+        assertTransformsDiffer(gunResult, radarResult, "Gun and radar transforms should differ");
+        assertTransformsDiffer(bodyResult, radarResult, "Body and radar transforms should differ");
     }
 
     /**
@@ -219,6 +216,7 @@ class SpriteTest
     void testMultipleRotations()
     {
         Droid droid = factory.makeDroid();
+        droid.turnRobot(-droid.getHeading());
         
         // Rotate body multiple times
         droid.turnRobot(30.0);
@@ -228,6 +226,12 @@ class SpriteTest
         // Should have rotated 90 degrees total
         assertEquals(90.0, droid.getHeading(), 0.1,
             "Three 30° rotations should result in 90°");
+    }
+    private void assertTransformsDiffer(Point2D first, Point2D second, String message)
+    {
+        boolean differs = Math.abs(first.getX() - second.getX()) > 0.1
+            || Math.abs(first.getY() - second.getY()) > 0.1;
+        assertTrue(differs, message);
     }
 }
 

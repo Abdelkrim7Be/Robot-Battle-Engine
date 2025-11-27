@@ -1,5 +1,6 @@
 package fr.ensibs.robots.impl;
 
+import fr.ensibs.robots.logic.BattleSetup;
 import fr.ensibs.robots.logic.ExhaustedException;
 import fr.ensibs.robots.logic.Location;
 import fr.ensibs.robots.logic.Robot;
@@ -76,6 +77,12 @@ class RobotImpl extends BaseDroid implements Robot
     @Override
     public void turnRadar(double degrees)
     {
+        if (Math.abs(degrees) < 1e-9) {
+            return;
+        }
+        if (!tryConsumeEnergy(BattleSetup.RADAR_TURN_ENERGY)) {
+            return;
+        }
         // Radar rotates independently
         radar.rotate(degrees);
     }

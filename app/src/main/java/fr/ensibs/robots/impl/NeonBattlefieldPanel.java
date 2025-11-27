@@ -41,8 +41,6 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     // Visual effects
     private final List<Object> additionalDrawables;
-    // NUCLEAR OPTION: DISABLED - Particle system causing spirals
-    // private final ParticleSystem particleSystem;
     private final MuzzleFlashSystem muzzleFlashSystem;
     private final DamageFlashSystem damageFlashSystem;
     private final CameraShaker cameraShaker; // MISSION 2.1: Screen shake
@@ -67,8 +65,6 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         // CRITICAL: Store direct reference to the shared views list
         this.viewsList = views;
         this.additionalDrawables = new ArrayList<>();
-        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
-        // this.particleSystem = new ParticleSystem();
         this.muzzleFlashSystem = new MuzzleFlashSystem();
         this.damageFlashSystem = new DamageFlashSystem();
         this.cameraShaker = new CameraShaker(); // MISSION 2.1: Screen shake
@@ -150,6 +146,7 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         
         // MISSION B: Draw phase indicator
         drawPhaseIndicator(g2d);
+        drawBattleOutcomeOverlay(g2d);
     }
     
     /**
@@ -246,14 +243,8 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 continue;
             }
             
-            // Determine color
-            Color teamColor = Color.YELLOW;
-            String name = view.getName().toLowerCase();
-            if (name.contains("duck")) {
-                teamColor = Color.CYAN;
-            } else if (name.contains("snail")) {
-                teamColor = Color.RED;
-            }
+            // Use the color assigned to the view (from TeamInfo)
+            Color teamColor = view.getColor();
             
             Location loc = robot.getLocation();
             int x = loc.getX();
@@ -298,14 +289,12 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
      * MISSION F: Draw health bar above robot
      */
     private void drawHealthBar(Graphics2D g, Droid robot, int x, int y) {
-        // Estimate max energy (1500 for robots, 2500 for droids)
-        double maxEnergy = 1500; // Default
-        String name = robot.getClass().getSimpleName().toLowerCase();
-        if (name.contains("droid")) {
-            maxEnergy = 2500;
-        }
+        // Use proper BattleSetup constants
+        double maxEnergy = (robot instanceof fr.ensibs.robots.logic.TeamLeader) 
+            ? fr.ensibs.robots.logic.BattleSetup.ROBOT_INITIAL_ENERGY 
+            : fr.ensibs.robots.logic.BattleSetup.DROID_INITIAL_ENERGY;
         
-        double healthPercent = robot.getEnergy() / maxEnergy;
+        double healthPercent = Math.max(0.0, Math.min(1.0, robot.getEnergy() / maxEnergy));
         
         int barWidth = 40;
         int barHeight = 4;
@@ -387,16 +376,16 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 continue;
             }
             
-            // A. DETERMINE COLOR (Hardcoded Team Logic)
-            Color teamColor = Color.YELLOW; // Default
-            String name = view.getName();
-            
-            String nameLower = name.toLowerCase();
-            if (nameLower.contains("duck")) {
-                teamColor = Color.CYAN; // Blue Team
-            } else if (nameLower.contains("snail")) {
-                teamColor = Color.RED;  // Red Team
+            // Use the color assigned to the view (from TeamInfo)
+            Color teamColor = view.getColor();
+            // DEBUG: Verify color is correct (can be removed later)
+            if (teamColor == null) {
+                System.err.println("WARNING: view.getColor() returned null for " + view.getName());
+                teamColor = Color.YELLOW; // Fallback
             }
+            
+            // Check if this is a TeamLeader (larger, different shape)
+            boolean isLeader = robot instanceof fr.ensibs.robots.logic.TeamLeader;
             
             Location loc = robot.getLocation();
             int x = loc.getX();
@@ -411,11 +400,40 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 // Draw body (at 0,0 because we translated the context)
                 double bodyHeading = robot.getHeading();
                 gRobot.rotate(Math.toRadians(bodyHeading - 90)); // Convert North->East
-                gRobot.setColor(teamColor);
-                gRobot.setStroke(new BasicStroke(3));
-                gRobot.drawRect(-20, -20, 40, 40); // Outline at (0,0) relative to robot
-                gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 200));
-                gRobot.fillRect(-20, -20, 40, 40); // Fill at (0,0)
+                
+                if (isLeader) {
+                    // LEADER: Larger hexagon shape to distinguish from droids
+                    gRobot.setColor(teamColor);
+                    gRobot.setStroke(new BasicStroke(4)); // Thicker outline for leader
+                    
+                    // Draw hexagon (6-sided shape)
+                    int size = 28; // Larger than droids
+                    java.awt.Polygon hexagon = new java.awt.Polygon();
+                    for (int i = 0; i < 6; i++) {
+                        double angle = Math.PI / 3 * i;
+                        hexagon.addPoint((int)(size * Math.cos(angle)), (int)(size * Math.sin(angle)));
+                    }
+                    gRobot.fillPolygon(hexagon);
+                    gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 255));
+                    gRobot.drawPolygon(hexagon);
+                    
+                    // Draw "L" indicator for Leader
+                    gRobot.setTransform(cameraG.getTransform());
+                    gRobot.translate(x, y);
+                    gRobot.setColor(Color.WHITE);
+                    gRobot.setFont(new Font("Monospaced", Font.BOLD, 12));
+                    gRobot.drawString("L", -5, 5);
+                    gRobot.setTransform(cameraG.getTransform());
+                    gRobot.translate(x, y);
+                    gRobot.rotate(Math.toRadians(bodyHeading - 90));
+                } else {
+                    // DROID: Standard square shape
+                    gRobot.setColor(teamColor);
+                    gRobot.setStroke(new BasicStroke(3));
+                    gRobot.drawRect(-20, -20, 40, 40); // Outline at (0,0) relative to robot
+                    gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 200));
+                    gRobot.fillRect(-20, -20, 40, 40); // Fill at (0,0)
+                }
                 
                 // Reset rotation for gun
                 gRobot.setTransform(cameraG.getTransform());
@@ -588,6 +606,48 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     }
     
     /**
+     * Display a victory or draw message when the battle is over.
+     */
+    private void drawBattleOutcomeOverlay(Graphics2D g2d)
+    {
+        List<DroidView<? extends Droid>> views = getViews();
+        List<DroidView<? extends Droid>> alive = new ArrayList<>();
+        for (DroidView<? extends Droid> view : views) {
+            if (view.getRobot().getEnergy() > 0) {
+                alive.add(view);
+            }
+        }
+        
+        if (alive.size() > 1 || views.isEmpty()) {
+            return;
+        }
+        
+        String message = alive.isEmpty()
+            ? "DRAW – ALL UNITS DESTROYED"
+            : "VICTORY – " + alive.get(0).getName();
+        
+        g2d.setFont(new Font("Monospaced", Font.BOLD, 32));
+        FontMetrics metrics = g2d.getFontMetrics();
+        int textWidth = metrics.stringWidth(message);
+        int textHeight = metrics.getHeight();
+        int x = (getWidth() - textWidth) / 2;
+        int y = getHeight() / 2;
+        
+        g2d.setColor(new Color(0, 0, 0, 180));
+        g2d.fillRoundRect(
+            x - 30,
+            y - metrics.getAscent() - 30,
+            textWidth + 60,
+            textHeight + 60,
+            20,
+            20
+        );
+        
+        g2d.setColor(new Color(0, 255, 0));
+        g2d.drawString(message, x, y);
+    }
+    
+    /**
      * Get views list - use direct reference instead of reflection.
      */
     private List<DroidView<? extends Droid>> getViews()
@@ -634,11 +694,6 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
             createMuzzleFlash(flashLoc, flashHeading);
         }
         
-        // NUCLEAR OPTION: DISABLED - Impact particles causing spirals
-        // List<BattlefieldImpl.HitEvent> hits = impl.getAndClearRecentHits();
-        // for (BattlefieldImpl.HitEvent hit : hits) {
-        //     createHitEffect(hit.location, hit.color);
-        // }
         
         // MISSION 2.1: Process damage events for camera shake
         // MISSION 4.2: Also check for kill streaks for announcer
@@ -733,8 +788,6 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
      */
     public void updateParticles()
     {
-        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
-        // particleSystem.update();
         muzzleFlashSystem.update();
         damageFlashSystem.update();
         // Camera shake is updated in paintComponent() for frame-perfect timing
@@ -789,14 +842,12 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     
     public void createHitEffect(fr.ensibs.robots.logic.Location location, Color color)
     {
-        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
-        // particleSystem.createHit(location, color);
+        // Visual hit effects disabled in neon renderer to keep rendering stable
     }
     
     public void createExplosion(fr.ensibs.robots.logic.Location location, Color color, int intensity)
     {
-        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
-        // particleSystem.createExplosion(location, color, intensity);
+        // Visual explosion effects disabled in neon renderer to keep rendering stable
     }
     
     public void registerDamageFlash(Droid droid)
@@ -804,10 +855,5 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         damageFlashSystem.registerFlash(droid);
     }
     
-    public ParticleSystem getParticleSystem()
-    {
-        // NUCLEAR OPTION: DISABLED - Particle system causing spirals
-        return null; // particleSystem;
-    }
 }
 

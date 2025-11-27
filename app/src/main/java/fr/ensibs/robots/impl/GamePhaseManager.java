@@ -22,12 +22,13 @@ public class GamePhaseManager {
     }
     
     // Phase timing (in game ticks, assuming ~60 ticks per second)
-    private static final int DEPLOYMENT_DURATION = 10 * 60;    // 10 seconds
-    private static final int SKIRMISH_DURATION = 50 * 60;      // 50 seconds (total 60)
-    private static final int PRESSURE_DURATION = 30 * 60;      // 30 seconds (total 90)
+    // CRITICAL: These durations assume engine runs at 60 ticks/second (16ms period)
+    private static final int DEPLOYMENT_DURATION = 0;          // NO COUNTDOWN - instant start
+    private static final int SKIRMISH_DURATION = 50 * 60;      // 50 seconds
+    private static final int PRESSURE_DURATION = 30 * 60;      // 30 seconds
     // SUDDEN_DEATH continues until game ends
     
-    private Phase currentPhase = Phase.DEPLOYMENT;
+    private Phase currentPhase = Phase.SKIRMISH;  // Start directly in combat
     private int ticksInPhase = 0;
     private int totalTicks = 0;
     
@@ -37,7 +38,7 @@ public class GamePhaseManager {
     private Runnable onPressureEnd;
     
     public GamePhaseManager() {
-        this.currentPhase = Phase.DEPLOYMENT;
+        this.currentPhase = Phase.SKIRMISH;  // Start directly in combat, no deployment
         this.ticksInPhase = 0;
         this.totalTicks = 0;
     }
@@ -51,6 +52,7 @@ public class GamePhaseManager {
         
         switch (currentPhase) {
             case DEPLOYMENT:
+                // Skip deployment immediately - transition to combat
                 if (ticksInPhase >= DEPLOYMENT_DURATION) {
                     transitionTo(Phase.SKIRMISH);
                     if (onDeploymentEnd != null) onDeploymentEnd.run();
@@ -78,7 +80,10 @@ public class GamePhaseManager {
     }
     
     private void transitionTo(Phase newPhase) {
+        System.out.println("\n[PHASE] ========================================");
         System.out.println("[PHASE] Transitioning from " + currentPhase + " to " + newPhase);
+        System.out.println("[PHASE] Total ticks: " + totalTicks + " (" + String.format("%.1f", totalTicks / 60.0) + " seconds)");
+        System.out.println("[PHASE] ========================================\n");
         currentPhase = newPhase;
         ticksInPhase = 0;
     }
@@ -100,8 +105,8 @@ public class GamePhaseManager {
     }
     
     public boolean canRobotsFire() {
-        // No firing during deployment
-        return currentPhase != Phase.DEPLOYMENT;
+        // Robots can fire immediately - no deployment phase
+        return true;
     }
     
     public boolean isZoneShrinking() {
@@ -128,8 +133,8 @@ public class GamePhaseManager {
     }
     
     public boolean isInvulnerable() {
-        // First 3 seconds of deployment = invulnerable
-        return currentPhase == Phase.DEPLOYMENT && ticksInPhase < (3 * 60);
+        // No invulnerability - battle starts immediately
+        return false;
     }
     
     // Setters for callbacks
@@ -142,7 +147,7 @@ public class GamePhaseManager {
      */
     public String getPhaseDisplayName() {
         switch (currentPhase) {
-            case DEPLOYMENT: return "DEPLOYMENT";
+            case DEPLOYMENT: return "COMBAT";  // Shouldn't show, but just in case
             case SKIRMISH: return "COMBAT";
             case PRESSURE: return "ZONE CLOSING";
             case SUDDEN_DEATH: return "SUDDEN DEATH";

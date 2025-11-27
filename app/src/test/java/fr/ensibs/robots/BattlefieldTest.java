@@ -48,12 +48,13 @@ public class BattlefieldTest
         // initialize the droid to be tested
         Droid droid = factory.makeDroid();
         droid.turnRobot(90 - droid.getHeading()); // set robot heading to 90
+        int energyBeforeMove = droid.getEnergy();
         int x = droid.getLocation().getX();
         int distance = x > FIELD_WIDTH / 2 ? -40 : +40; // right or left according to the droid location
 
         // initialize the expected result
         Location expected = new Location(x + distance, droid.getLocation().getY());
-        int expectedEnergy = DROID_INITIAL_ENERGY - MOTION_ENERGY;
+        int expectedEnergy = energyBeforeMove - MOTION_ENERGY;
 
         // invoke the tested method
         battlefield.move(droid, distance);
@@ -76,12 +77,13 @@ public class BattlefieldTest
         // initialize the droid to be tested
         Droid droid = factory.makeDroid();
         droid.turnRobot(180 - droid.getHeading()); // set robot heading to 180
+        int energyBeforeMove = droid.getEnergy();
         int y = droid.getLocation().getY();
         int distance = y > FIELD_HEIGHT / 2 ? -40 : +40; // up or down according to the droid location
 
         // initialize the expected result
         Location expected = new Location(droid.getLocation().getX(), y + distance);
-        int expectedEnergy = DROID_INITIAL_ENERGY - MOTION_ENERGY;
+        int expectedEnergy = energyBeforeMove - MOTION_ENERGY;
 
         // invoke the tested method
         battlefield.move(droid, distance);
@@ -109,12 +111,13 @@ public class BattlefieldTest
         // choose the direction according to the droid location
         double degrees = x > FIELD_WIDTH / 2.0 ? (y > FIELD_HEIGHT / 2.0 ? 300 : 240) : (y > FIELD_HEIGHT / 2.0 ? 60 : 120);
         droid.turnRobot(degrees - droid.getHeading());
+        int energyBeforeMove = droid.getEnergy();
 
         // initialize the expected result
         int dx = (int) Math.round((x > FIELD_WIDTH / 2.0 ? -20 : +20) * Math.sqrt(3));
         int dy = y > FIELD_HEIGHT / 2.0 ? -20 : +20;
         Location expected = new Location(x + dx, y + dy);
-        int expectedEnergy = DROID_INITIAL_ENERGY - MOTION_ENERGY;
+        int expectedEnergy = energyBeforeMove - MOTION_ENERGY;
 
         // invoke the tested method
         battlefield.move(droid, 40);
@@ -141,7 +144,7 @@ public class BattlefieldTest
         // initialize the expected result
         Location expected = new Location(droid.getLocation().getX(), FIELD_HEIGHT - ROBOT_RADIUS); // expected location after the collision
         int nbMoves = (int)Math.ceil((FIELD_HEIGHT - droid.getLocation().getY())/MAX_DISTANCE_MOVE);     // nb of moves to move out of the field
-        int expectedEnergy = DROID_INITIAL_ENERGY - COLLISION_DAMAGE;                                 // expected energy after the collision
+        int expectedEnergy = droid.getEnergy();
 
         // move until a collision occurs (going out of the field)
         try {
@@ -151,6 +154,7 @@ public class BattlefieldTest
             }
             fail("Expected a CollisionException to be thrown at " + expected + ". Location: " + droid.getLocation());
         } catch (CollisionException e) {
+            expectedEnergy -= COLLISION_DAMAGE;
             assertEquals(expected, e.getLocation(), "Unexpected collision location");
             assertEquals(expected, droid.getLocation(), "Unexpected droid location after collision");
             assertEquals(expectedEnergy, droid.getEnergy(), "Unexpected energy after collision");
@@ -176,10 +180,9 @@ public class BattlefieldTest
         // initialize the expected result (should collide on the left of robot2)
         int nbMoves = (int)Math.ceil((droid2.getLocation().getX() - droid1.getLocation().getX())/MAX_DISTANCE_MOVE);
         Location expected = new Location(droid2.getLocation().getX() - 2 * ROBOT_RADIUS, droid2.getLocation().getY());
-        int expectedEnergy1 = droid1.getEnergy() - COLLISION_DAMAGE;
-        int expectedEnergy2 = droid2.getEnergy() - COLLISION_DAMAGE;
-
         droid1.turnRobot(90 - droid1.getHeading()); // turn to right
+        int expectedEnergy1 = droid1.getEnergy();
+        int expectedEnergy2 = droid2.getEnergy();
         try {
             for (int i = 0; i < nbMoves; i++) {
                 expectedEnergy1 -= MOTION_ENERGY;
@@ -187,6 +190,8 @@ public class BattlefieldTest
             }
             fail("Expected a CollisionException to be thrown at " + expected + ". Location: " + droid1.getLocation());
         } catch (CollisionException e) {
+            expectedEnergy1 -= COLLISION_DAMAGE;
+            expectedEnergy2 -= COLLISION_DAMAGE;
             assertEquals(expected, e.getLocation(), "Unexpected collision location");
             assertEquals(expected, droid1.getLocation(), "Unexpected droid location after collision");
             assertEquals(expectedEnergy1, droid1.getEnergy(), "Unexpected energy after collision for the 1st robot");
@@ -239,17 +244,19 @@ public class BattlefieldTest
         moveTo(droid1, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
         Droid droid2 = addSameLine(droid1);
 
-        // initialize the expected result
-        int expectedEnergy1 = droid1.getEnergy() + 10;
-        int expectedEnergy2 = droid2.getEnergy() - 20;
-
         // invoke the tested method
         droid1.turnGun(90 - droid1.getGunHeading());
-        battlefield.fire(droid1, 5);
+        int shooterEnergyBeforeFire = droid1.getEnergy();
+        int targetEnergyBeforeFire = droid2.getEnergy();
+        int firePower = 5;
+        battlefield.fire(droid1, firePower);
+        stepBattlefield();
 
         // check the result
-        assertEquals(expectedEnergy1, droid1.getEnergy(), "Unexpected energy after fire");
-        assertEquals(expectedEnergy2, droid2.getEnergy(), "Unexpected energy after fire");
+        int lifeSteal = 3 * firePower;
+        int damage = 4 * firePower + 2 * (firePower - 1);
+        assertEquals(shooterEnergyBeforeFire - firePower + lifeSteal, droid1.getEnergy(), "Unexpected energy after fire");
+        assertEquals(targetEnergyBeforeFire - damage, droid2.getEnergy(), "Unexpected energy after fire");
     }
 
     //-------------------------------------------------------------------------
@@ -392,6 +399,20 @@ public class BattlefieldTest
         droid.turnRobot(90);
         while (droid.getLocation().getY() != y) {
             battlefield.move(droid, y - droid.getLocation().getY());
+        }
+    }
+
+    private void stepBattlefield()
+    {
+        Battlefield battlefield = factory.makeBattlefield();
+        try {
+            java.lang.reflect.Method method = battlefield.getClass().getDeclaredMethod("detectCollisions");
+            method.setAccessible(true);
+            for (int i = 0; i < 100; i++) {
+                method.invoke(battlefield);
+            }
+        } catch (ReflectiveOperationException e) {
+            fail("Unable to advance battlefield state: " + e.getMessage());
         }
     }
 }

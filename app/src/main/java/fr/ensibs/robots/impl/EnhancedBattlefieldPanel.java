@@ -3,7 +3,6 @@ package fr.ensibs.robots.impl;
 import fr.ensibs.robots.logic.Droid;
 import fr.ensibs.robots.view.BattlefieldPanel;
 import fr.ensibs.robots.view.DroidView;
-// import fr.ensibs.robots.view.IDrawable; // TODO: Uncomment when api module is built
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -34,8 +33,6 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
     private static final Color GRID_COLOR = new Color(240, 240, 240); // Light gray
     private static final Color BORDER_COLOR = new Color(100, 100, 100); // Dark gray
     
-    // TODO: Use IDrawable when api module is built
-    // private final List<IDrawable> additionalDrawables;
     private final List<Object> additionalDrawables; // Temporary: will be List<IDrawable>
     
     // HUD and effects components
@@ -127,8 +124,9 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
         // Draw additional drawable entities (bullets, particles, etc.)
         drawAdditionalEntities(g2d);
         
-        // Draw particle effects
-        particleSystem.draw(g2d);
+        // DISABLED: Particle effects causing yellow spiral bug
+        // TODO: Fix particle system cleanup before re-enabling
+        // particleSystem.draw(g2d);
         
         // Draw HUD overlay (in battlefield coordinates)
         if (showHUD) {
@@ -198,8 +196,7 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
      */
     private void drawAdditionalEntities(Graphics2D g2d)
     {
-        // Draw all additional entities that have a draw method
-        // TODO: Use IDrawable interface when api module is built
+        // Draw all additional entities that expose a draw(Graphics2D) method
         for (Object drawable : new ArrayList<>(additionalDrawables)) {
             try {
                 // Use reflection to call draw method if it exists

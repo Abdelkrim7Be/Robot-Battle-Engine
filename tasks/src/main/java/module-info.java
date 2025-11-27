@@ -1,3 +1,3 @@
-open module fr.ensibs.examples { // TODO replace 'examples' with your team name
+open module fr.ensibs.tasks {
     requires fr.ensibs.robots.api;
 }

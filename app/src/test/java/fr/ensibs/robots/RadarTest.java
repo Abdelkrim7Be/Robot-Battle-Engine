@@ -52,16 +52,16 @@ class RadarTest
         Droid target3 = factory.makeDroid();
         
         // Position scanner at center
-        moveTo(scanner, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+        positionDroid(scanner, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
         
         // Position target1 to the right (East) of scanner
-        moveTo(target1, FIELD_WIDTH / 2 + 100, FIELD_HEIGHT / 2);
+        positionDroid(target1, FIELD_WIDTH / 2 + 100, FIELD_HEIGHT / 2);
         
         // Position target2 to the right and slightly up (East-Northeast) of scanner
-        moveTo(target2, FIELD_WIDTH / 2 + 80, FIELD_HEIGHT / 2 - 50);
+        positionDroid(target2, FIELD_WIDTH / 2 + 80, FIELD_HEIGHT / 2 - 50);
         
         // Position target3 to the left (West) of scanner - should NOT be detected
-        moveTo(target3, FIELD_WIDTH / 2 - 100, FIELD_HEIGHT / 2);
+        positionDroid(target3, FIELD_WIDTH / 2 - 100, FIELD_HEIGHT / 2);
         
         // Orient radar towards East (90 degrees) to see target1 and target2
         scanner.turnRadar(90.0 - scanner.getRadarHeading());
@@ -91,10 +91,10 @@ class RadarTest
         Droid target = factory.makeDroid();
         
         // Position scanner at center
-        moveTo(scanner, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+        positionDroid(scanner, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
         
         // Position target to the left (West) of scanner
-        moveTo(target, FIELD_WIDTH / 2 - 100, FIELD_HEIGHT / 2);
+        positionDroid(target, FIELD_WIDTH / 2 - 100, FIELD_HEIGHT / 2);
         
         // Orient radar towards East (90 degrees) - target is behind scanner
         scanner.turnRadar(90.0 - scanner.getRadarHeading());
@@ -217,7 +217,11 @@ class RadarTest
             int dx = x - droid.getLocation().getX();
             int moveDistance = Math.max(-MAX_DISTANCE_MOVE, Math.min(MAX_DISTANCE_MOVE, dx));
             if (moveDistance == 0) break;
-            battlefield.move(droid, moveDistance);
+            try {
+                battlefield.move(droid, moveDistance);
+            } catch (CollisionException e) {
+                break;
+            }
         }
         
         // Move to y location
@@ -226,7 +230,35 @@ class RadarTest
             int dy = y - droid.getLocation().getY();
             int moveDistance = Math.max(-MAX_DISTANCE_MOVE, Math.min(MAX_DISTANCE_MOVE, dy));
             if (moveDistance == 0) break;
-            battlefield.move(droid, moveDistance);
+            try {
+                battlefield.move(droid, moveDistance);
+            } catch (CollisionException e) {
+                break;
+            }
+        }
+    }
+
+    private void positionDroid(Droid droid, int x, int y)
+    {
+        try {
+            Class<?> type = droid.getClass();
+            java.lang.reflect.Method method = null;
+            while (type != null) {
+                try {
+                    method = type.getDeclaredMethod("setLocation", Location.class);
+                    break;
+                } catch (NoSuchMethodException e) {
+                    type = type.getSuperclass();
+                }
+            }
+            if (method == null) {
+                fail("Unable to position robot: setLocation not found");
+                return;
+            }
+            method.setAccessible(true);
+            method.invoke(droid, new Location(x, y));
+        } catch (ReflectiveOperationException e) {
+            fail("Unable to position robot: " + e.getMessage());
         }
     }
 }

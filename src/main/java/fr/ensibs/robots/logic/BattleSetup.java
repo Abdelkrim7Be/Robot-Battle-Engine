@@ -25,12 +25,12 @@ public interface BattleSetup
     /**
      * The droids' initial energy
      */
-    int DROID_INITIAL_ENERGY = 700;
+    int DROID_INITIAL_ENERGY = 2500;
 
     /**
      * The robots' initial energy
      */
-    int ROBOT_INITIAL_ENERGY = 500;
+    int ROBOT_INITIAL_ENERGY = 1500;
 
     /**
      * The number of teammates in a team, team leader excluded
@@ -50,7 +50,7 @@ public interface BattleSetup
     /**
      * The gun heat amount dropped each turn
      */
-    int GUN_COOLING = 5;
+    int GUN_COOLING = 7;
 
     /**
      * The energy spent for a radar scanning
@@ -75,7 +75,7 @@ public interface BattleSetup
     /**
      * The energy spent for a robot's movement
      */
-    int MOTION_ENERGY = 1;
+    int MOTION_ENERGY = 0;
 
     /**
      * The energy lost when a collision occurs (for both robots) or when

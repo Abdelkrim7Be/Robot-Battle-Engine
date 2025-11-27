@@ -177,15 +177,15 @@ public class ControlsPanel extends JPanel implements ActionListener
         // FIX 2: TOTAL BLACKOUT - Entire hierarchy must be dark
         // Table
         robotsTable.setBackground(new Color(30, 30, 30)); // Charcoal
-        robotsTable.setForeground(Color.GREEN); // Green text
+        robotsTable.setForeground(Color.WHITE); // White text (changed from green)
         robotsTable.setFont(new Font("Monospaced", Font.PLAIN, 11));
         robotsTable.setGridColor(new Color(51, 51, 51)); // #333333
         robotsTable.setSelectionBackground(new Color(51, 51, 51));
-        robotsTable.setSelectionForeground(Color.GREEN);
+        robotsTable.setSelectionForeground(Color.WHITE); // White when selected
         
         // Table header - BLACK background, GREEN text
         robotsTable.getTableHeader().setBackground(Color.BLACK);
-        robotsTable.getTableHeader().setForeground(Color.GREEN);
+        robotsTable.getTableHeader().setForeground(Color.WHITE); // White text (changed from green)
         robotsTable.getTableHeader().setFont(new Font("Monospaced", Font.BOLD, 11));
         
         TableColumnModel columnModel = robotsTable.getColumnModel();
@@ -295,12 +295,41 @@ public class ControlsPanel extends JPanel implements ActionListener
             } else {
                 setBackground(new Color(30, 30, 30)); // Charcoal
             }
-            setForeground(Color.GREEN); // GREEN text (terminal style)
+            // MISSION 4: Change generic text to WHITE (not green)
+            // Keep robot names in team colors, energy values in white
+            if (col == 0) {
+                // Robot name column - use team color
+                Color teamColor = determineTeamColor(views.get(row));
+                setForeground(teamColor);
+            } else {
+                // Energy column - white text
+                setForeground(Color.WHITE);
+            }
+            
             setFont(new Font("Monospaced", Font.PLAIN, 11));
+            
+            // Add padding between rows (via border)
+            setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
 
             // define the text alignment (left for names and center for energy values)
             setHorizontalAlignment(col == 1 ? JLabel.CENTER : JLabel.LEFT);
             return this;
+        }
+        
+        /**
+         * MISSION 4: Determine team color based on robot name.
+         * Duck -> CYAN (Blue), Snail -> RED, fallback to assigned color.
+         */
+        private Color determineTeamColor(DroidView<? extends Droid> view)
+        {
+            String name = view.getName().toLowerCase();
+            if (name.contains("duck")) {
+                return Color.CYAN;
+            } else if (name.contains("snail")) {
+                return Color.RED;
+            }
+            // Fallback to assigned color
+            return view.getColor();
         }
     }
     

@@ -18,36 +18,19 @@ import java.util.List;
 
 import static fr.ensibs.robots.logic.BattleSetup.NB_TEAMMATES;
 
-/**
- * Panel that contains buttons to control battle actions (load and start/stop)
- * and information about the battle state
- *
- * @author Pascale Launay
- */
 public class ControlsPanel extends JPanel implements ActionListener
 {
-    // actions names
     private static final String START = "Start", STOP = "Stop";
-
-    private final Battlefield battlefield;      // the battlefield instance
-    private final BattlefieldEngine engine;     // the engine that runs the robots tasks periodically
-    private final List<DroidView<? extends Droid>> views; // the views of the robots engaged in the battlefield (SHARED LIST)
-    private final BattleFactory factory;        // factory to make robots
-    private final RobotTaskFactory taskFactory; // factory to make tasks
-
-    private JButton startButton;    // start/stop button
-    public JTable robotsTable;                 // table that displays the robots states (public for external updates)
-    private RobotsTableModel tableModel;        // Store reference to model for updates
-    private java.util.Map<Droid, Integer> robotKillsMap = new java.util.HashMap<>(); // Kills per robot (by instance)
-    private java.util.Map<String, Integer> robotKillsByNameMap = new java.util.HashMap<>(); // Kills per robot (by name) - fallback
-
-    /**
-     * Constructor
-     *
-     * @param views       the views of the robots engaged in the battlefield
-     * @param factory     the factory to make robots
-     * @param taskFactory the factory to make tasks
-     */
+    private final Battlefield battlefield;
+    private final BattlefieldEngine engine;
+    private final List<DroidView<? extends Droid>> views;
+    private final BattleFactory factory;
+    private final RobotTaskFactory taskFactory;
+    private JButton startButton;
+    public JTable robotsTable;
+    private RobotsTableModel tableModel;        
+    private java.util.Map<Droid, Integer> robotKillsMap = new java.util.HashMap<>();
+    private java.util.Map<String, Integer> robotKillsByNameMap = new java.util.HashMap<>();
     public ControlsPanel(List<DroidView<? extends Droid>> views, BattleFactory factory, RobotTaskFactory taskFactory)
     {
         super(new BorderLayout(5, 5));
@@ -202,7 +185,7 @@ public class ControlsPanel extends JPanel implements ActionListener
         // Container
         scrollPane.setBackground(new Color(30, 30, 30));
         
-        // Viewport - CRITICAL: Must be dark
+        // Viewport must be dark
         JViewport viewport = scrollPane.getViewport();
         viewport.setBackground(new Color(30, 30, 30));
         viewport.setOpaque(true);
@@ -497,7 +480,6 @@ public class ControlsPanel extends JPanel implements ActionListener
             // Try to find examples.jar in common locations
             java.io.File jarFile = findExamplesJar();
             if (jarFile == null || !jarFile.exists()) {
-                System.err.println("Warning: examples.jar not found. No robots will be loaded automatically.");
                 return;
             }
 
@@ -538,9 +520,7 @@ public class ControlsPanel extends JPanel implements ActionListener
                 });
             }
 
-            System.out.println("Auto-loaded " + (robotClasses.size() + leaderClasses.size()) + " robot/team types");
         } catch (Exception e) {
-            System.err.println("Error auto-loading robots: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -701,7 +681,6 @@ public class ControlsPanel extends JPanel implements ActionListener
      */
     private void updateKillFeedDisplay() {
         SwingUtilities.invokeLater(() -> {
-            System.out.println("DEBUG: updateKillFeedDisplay() called - kill feed has " + killFeedEntries.size() + " entries");
             if (killFeedArea != null) {
                 StringBuilder sb = new StringBuilder();
                 for (KillFeedEntry entry : killFeedEntries) {
@@ -779,11 +758,8 @@ public class ControlsPanel extends JPanel implements ActionListener
                 // Force table to refresh - the model uses the shared views list
                 tableModel.fireTableDataChanged();
                 robotsTable.repaint();
-                // Debug: Log if views is empty
                 if (views.isEmpty()) {
-                    System.out.println("[ControlsPanel] WARNING: views list is empty!");
                 } else {
-                    System.out.println("[ControlsPanel] Updating table with " + views.size() + " robots");
                 }
             });
         }

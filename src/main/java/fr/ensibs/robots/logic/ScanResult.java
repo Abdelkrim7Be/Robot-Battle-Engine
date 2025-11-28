@@ -1,58 +1,26 @@
 package fr.ensibs.robots.logic;
 
-/**
- * Represents the result of a radar scan, containing relative information
- * about detected robots.
- * 
- * <p>This class provides only relative information (distance and bearing angle)
- * to prevent cheating - robots cannot access the actual enemy object or absolute
- * location directly.
- * 
- * @author Robot Wars Team
- */
 public class ScanResult
 {
-    private final double distance; // Distance to the scanned robot in pixels
-    private final double bearing;  // Bearing angle in degrees (0-360, relative to scanner)
+    private final double distance;
+    private final double bearing;
     
-    /**
-     * Constructor
-     * 
-     * @param distance the distance to the scanned robot in pixels
-     * @param bearing the bearing angle in degrees (0-360, where 0 = North)
-     */
     public ScanResult(double distance, double bearing)
     {
         this.distance = distance;
         this.bearing = normalizeBearing(bearing);
     }
     
-    /**
-     * Get the distance to the scanned robot
-     * 
-     * @return the distance in pixels
-     */
     public double getDistance()
     {
         return distance;
     }
     
-    /**
-     * Get the bearing angle to the scanned robot
-     * 
-     * @return the bearing in degrees (0-360, where 0 = North)
-     */
     public double getBearing()
     {
         return bearing;
     }
     
-    /**
-     * Normalize a bearing angle to the range [0, 360[
-     * 
-     * @param angle the angle to normalize
-     * @return the normalized angle
-     */
     private static double normalizeBearing(double angle)
     {
         double result = angle % 360.0;

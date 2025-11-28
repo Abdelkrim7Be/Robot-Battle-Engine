@@ -1,10 +1,18 @@
-This project contains the shared classes and interfaces that will be used to develop the robots application: 
+# Robot Wars API
 
-* `fr.ensibs.robots.factories` contains the factories you must implement to provide your own implementations 
-  of the interfaces and abstract classes of the other packages
-* `fr.ensibs.robots.logic` contains the interfaces that define the robots application logic, and some useful classes
-  (exceptions and `BattlefieldEngine` class)
-* `fr.ensibs.robots.view` contains classes implementing the robots application view (UI) and some abstract classes 
-  (`DroidView` and `RobotView`)
+Interfaces and base classes for the Robot Wars battle engine. This module defines the contracts that all robots and game components must follow.
 
-It should be included in your project as a GIT submodule (see documentation in the `libs` project)
+## Contents
+
+This module contains:
+
+- Robot interface: Base contract for all robot implementations
+- Droid interface: Contract for droid robots without radar
+- TeamLeader interface: Contract for team leader robots with radar
+- Battlefield interface: Contract for the game battlefield
+- BattlefieldEngine: Core game engine implementation
+- Additional interfaces and classes for robot logic, view components, and factories
+
+## Usage
+
+Other modules depend on this module. Robot implementations must implement the Robot, Droid, or TeamLeader interfaces to participate in battles.

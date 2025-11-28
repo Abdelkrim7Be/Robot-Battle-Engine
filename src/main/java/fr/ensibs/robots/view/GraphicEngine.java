@@ -8,7 +8,7 @@ import java.awt.event.ActionEvent;
  * Engine that displays a battlefield view by invoking its {@link BattlefieldPanel#repaint()}
  * method periodically
  *
- * @author Pascale Launay
+ * 
  */
 public class GraphicEngine
 {

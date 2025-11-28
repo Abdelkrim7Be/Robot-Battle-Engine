@@ -16,7 +16,7 @@ import java.util.List;
  * Dialog opened when the LOAD button is clicked used to select a jar file,
  * load the classes it contains, and allow to choose a class, and a robot color
  *
- * @author Pascale Launay
+ * 
  */
 public class RobotFactoryDialog extends JDialog implements ActionListener
 {

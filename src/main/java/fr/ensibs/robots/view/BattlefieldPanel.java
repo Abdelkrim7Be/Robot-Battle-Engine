@@ -13,7 +13,7 @@ import static fr.ensibs.robots.logic.BattleSetup.FIELD_WIDTH;
 /**
  * The panel that displays the robots engaged on the battlefield
  *
- * @author Pascale Launay
+ * 
  */
 public class BattlefieldPanel extends JPanel
 {

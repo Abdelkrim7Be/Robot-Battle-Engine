@@ -14,7 +14,7 @@ import java.util.List;
  * The application frame composed of a battlefield panel where the battle takes place and
  * a controls panel containing all buttons and battle status information
  *
- * @author Pascale Launay
+ * 
  */
 public class BattlefieldFrame extends JFrame
 {

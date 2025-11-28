@@ -7,15 +7,6 @@ import java.util.List;
 import static fr.ensibs.robots.logic.BattleSetup.*;
 import static fr.ensibs.tasks.teams.abdelkrim.Utils.normalRelativeAngle;
 
-/**
- * AbdelkrimS Team Droid - Aggressive Hunter Strategy
- * 
- * <p>Behavior:
- * - Receives target positions from leader
- * - Rushes toward targets aggressively
- * - Fires frequently when aligned
- * - Follows leader closely
- */
 public class AbdelkrimDroid implements RobotTask<Robot>
 {
     private Robot robot;
@@ -98,74 +89,69 @@ public class AbdelkrimDroid implements RobotTask<Robot>
                 }
             }
             
-            // Move toward target aggressively - ALWAYS MOVE
             double bodyTurn = normalRelativeAngle(absoluteBearingRad - Math.toRadians(robot.getHeading()));
-            try {
-                robot.turnRobot(Math.toDegrees(bodyTurn)); // Full turn for faster response
-                robot.move(Math.min(50, distance / 2)); // MUCH MORE AGGRESSIVE movement (50 max)
-            } catch (CollisionException | ExhaustedException e) {
-                // Turn away on collision but keep trying to move
+            double bodyTurnDegrees = Math.abs(Math.toDegrees(bodyTurn));
+            
+            if (distance > 200) {
                 try {
+                    robot.turnRobot(Math.toDegrees(bodyTurn));
+                    robot.move(Math.min(30, distance / 3));
+                } catch (CollisionException | ExhaustedException e) {
                     robot.turnRobot(90);
-                    robot.move(30); // Still move after turning
-                } catch (Exception ex) {
-                    // If still blocked, try different direction
-                    try {
-                        robot.turnRobot(-90);
-                        robot.move(20);
-                    } catch (Exception ex2) {
-                        // Ignore
-                    }
+                }
+            } else if (distance < 100) {
+                try {
+                    robot.turnRobot(Math.toDegrees(bodyTurn) + 90);
+                    robot.move(20);
+                } catch (CollisionException | ExhaustedException e) {
+                    robot.turnRobot(-90);
+                }
+            } else {
+                try {
+                    double strafeAngle = normalRelativeAngle(absoluteBearingRad - Math.toRadians(robot.getHeading()) + Math.PI / 2);
+                    robot.turnRobot(Math.toDegrees(strafeAngle));
+                    robot.move(15);
+                } catch (CollisionException | ExhaustedException e) {
+                    robot.turnRobot(90);
                 }
             }
         } else {
-            // STEP 3: No target - ALWAYS move toward center to engage
             Location current = robot.getLocation();
-            double centerX = FIELD_WIDTH / 2.0;
-            double centerY = FIELD_HEIGHT / 2.0;
-            double dx = centerX - current.getX();
-            double dy = centerY - current.getY();
-            double distance = Math.hypot(dx, dy);
+            moveCounter++;
+            int margin = 50;
             
-            if (distance > 30) { // Move toward center - ALWAYS MOVE
-                double absoluteBearingRad = Math.atan2(dx, -dy);
-                double bodyTurn = normalRelativeAngle(absoluteBearingRad - Math.toRadians(robot.getHeading()));
-                
+            if (current.getX() < margin || current.getX() > FIELD_WIDTH - margin ||
+                current.getY() < margin || current.getY() > FIELD_HEIGHT - margin) {
+                double centerX = FIELD_WIDTH / 2.0;
+                double centerY = FIELD_HEIGHT / 2.0;
+                double dx = centerX - current.getX();
+                double dy = centerY - current.getY();
+                double angle = Math.toDegrees(Math.atan2(dx, -dy));
+                if (angle < 0) angle += 360;
+                double currentHeading = robot.getHeading();
+                double turnAngle = angle - currentHeading;
+                if (turnAngle > 180) turnAngle -= 360;
+                if (turnAngle < -180) turnAngle += 360;
                 try {
-                    robot.turnRobot(Math.toDegrees(bodyTurn)); // Full turn
-                    robot.move(Math.min(50, distance / 2)); // MUCH MORE AGGRESSIVE (50 max distance)
+                    robot.turnRobot(turnAngle);
+                    robot.move(20);
                 } catch (CollisionException | ExhaustedException e) {
-                    // Turn away on collision but keep moving
-                    try {
-                        robot.turnRobot(90);
-                        robot.move(40); // Still move aggressively
-                    } catch (Exception ex) {
-                        // Try opposite direction
-                        try {
-                            robot.turnRobot(-90);
-                            robot.move(30);
-                        } catch (Exception ex2) {
-                            // Ignore
-                        }
-                    }
+                    robot.turnRobot(90);
                 }
             } else {
-                // At center - patrol around
-                moveCounter++;
-                try {
-                    robot.move(10); // Forward movement
-                    
-                    // Turn periodically to patrol
-                    if (moveCounter % 20 == 0) {
-                        double randomTurn = (Math.random() - 0.5) * 90; // -45 to +45 degrees
-                        robot.turnRobot(randomTurn);
-                    }
-                } catch (CollisionException | ExhaustedException e) {
-                    // Turn away on collision
+                if (moveCounter % 40 == 0) {
+                    double randomTurn = (Math.random() - 0.5) * 60;
                     try {
+                        robot.turnRobot(randomTurn);
+                        robot.move(20);
+                    } catch (CollisionException | ExhaustedException e) {
                         robot.turnRobot(90);
-                    } catch (Exception ex) {
-                        // Ignore
+                    }
+                } else {
+                    try {
+                        robot.move(15);
+                    } catch (CollisionException | ExhaustedException e) {
+                        robot.turnRobot(90);
                     }
                 }
             }

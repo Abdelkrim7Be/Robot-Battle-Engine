@@ -486,15 +486,20 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                     gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 255));
                     gRobot.drawPolygon(hexagon);
                     
-                    // Draw "L" indicator for Leader
-                    gRobot.setTransform(cameraG.getTransform());
-                    gRobot.translate(x, y);
-                    gRobot.setColor(Color.WHITE);
-                    gRobot.setFont(new Font("Monospaced", Font.BOLD, 12));
-                    gRobot.drawString("L", -5, 5);
                     gRobot.setTransform(cameraG.getTransform());
                     gRobot.translate(x, y);
                     gRobot.rotate(Math.toRadians(bodyHeading - 90));
+                    
+                    if (robot instanceof fr.ensibs.robots.logic.Robot robotWithRadar) {
+                        double radarHeading = robotWithRadar.getRadarHeading();
+                        double radarRelativeAngle = radarHeading - bodyHeading;
+                        gRobot.rotate(Math.toRadians(radarRelativeAngle));
+                        gRobot.setColor(Color.YELLOW);
+                        gRobot.setStroke(new BasicStroke(2));
+                        int dishSize = 8;
+                        gRobot.drawLine(0, -size - 5, 0, -size - 5 - dishSize);
+                        gRobot.drawLine(-dishSize/2, -size - 5 - dishSize, dishSize/2, -size - 5 - dishSize);
+                    }
                 } else {
                     // DROID: Standard square shape
                 gRobot.setColor(teamColor);

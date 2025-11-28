@@ -7,15 +7,6 @@ import java.util.List;
 import static fr.ensibs.robots.logic.BattleSetup.*;
 import static fr.ensibs.tasks.teams.abdelkrim.Utils.normalRelativeAngle;
 
-/**
- * AbdelkrimS Team Leader - Aggressive Hunter Strategy
- * 
- * <p>Behavior:
- * - Actively hunts enemies, moves toward center
- * - Aggressive scanning with continuous radar spinning
- * - Broadcasts target positions to teammates
- * - Fires when reasonably aligned (within 10-15 degrees)
- */
 public class AbdelkrimLeader implements RobotTask<TeamLeader>
 {
     public static final String TEAM_NAME = "AbdelkrimS";
@@ -43,42 +34,32 @@ public class AbdelkrimLeader implements RobotTask<TeamLeader>
     @Override
     public void run()
     {
-        // DEBUG: Log that run() was called
-        System.out.println("[AbdelkrimLeader] run() called - energy: " + leader.getEnergy());
-        
         if (leader.getEnergy() <= 0) {
-            System.out.println("[AbdelkrimLeader] Robot is dead, returning");
-            return; // Dead
+            return;
         }
         
         try {
-            // STEP 1: Always spin radar to find enemies
             leader.turnRadar(10.0 * radarDirection);
-            
-            // Reverse radar direction periodically
             moveCounter++;
-            if (moveCounter % 36 == 0) { // Every 36 ticks (360 degrees / 10)
+            if (moveCounter % 36 == 0) {
                 radarDirection *= -1;
             }
             
-            // STEP 2: Scan for enemies
             List<Location> enemies = leader.scan();
             Location enemyLocation = null;
+            double closestEnemyDist = Double.MAX_VALUE;
             
-            // Filter out teammates from scan results
             for (Location enemyLoc : enemies) {
                 boolean isTeammate = false;
-                // Check if this location is close to any teammate
                 for (Droid teammate : leader.getTeammates()) {
                     double dx = enemyLoc.getX() - teammate.getLocation().getX();
                     double dy = enemyLoc.getY() - teammate.getLocation().getY();
                     double dist = Math.hypot(dx, dy);
-                    if (dist < 50) { // Within 50 pixels = likely teammate
+                    if (dist < 50) {
                         isTeammate = true;
                         break;
                     }
                 }
-                // Also check if close to self
                 double dx = enemyLoc.getX() - leader.getLocation().getX();
                 double dy = enemyLoc.getY() - leader.getLocation().getY();
                 double dist = Math.hypot(dx, dy);
@@ -86,109 +67,112 @@ public class AbdelkrimLeader implements RobotTask<TeamLeader>
                     isTeammate = true;
                 }
                 
-                if (!isTeammate) {
+                if (!isTeammate && dist < closestEnemyDist) {
                     enemyLocation = enemyLoc;
-                    break; // Attack first enemy found
+                    closestEnemyDist = dist;
                 }
             }
             
             if (enemyLocation != null) {
-                // Found enemy!
                 targetX = enemyLocation.getX();
                 targetY = enemyLocation.getY();
                 hasTarget = true;
                 
-                // Broadcast to team
                 String targetMessage = "TARGET:" + targetX + ":" + targetY;
                 TeamMessage message = new TeamMessage(TeamMessage.MessageType.BROADCAST, targetMessage, leader);
                 leader.broadcastMessage(message);
                 
-                // Calculate angle to target
                 Location current = leader.getLocation();
                 double dx = targetX - current.getX();
                 double dy = targetY - current.getY();
+                double distance = Math.hypot(dx, dy);
                 double absoluteBearingRad = Math.atan2(dx, -dy);
                 
-                // Turn gun toward target
                 double gunHeadingRad = Math.toRadians(leader.getGunHeading());
                 double gunTurnRad = normalRelativeAngle(absoluteBearingRad - gunHeadingRad);
                 leader.turnGun(Math.toDegrees(gunTurnRad));
                 
-                // Fire if reasonably aligned (within 15 degrees)
                 double gunTurnDegrees = Math.abs(Math.toDegrees(gunTurnRad));
                 if (gunTurnDegrees < 15) {
                     try {
-                        // Use power based on distance (more power when closer)
-                        double distance = Math.hypot(dx, dy);
                         int power = distance < 150 ? 3 : (distance < 300 ? 2 : 1);
                         leader.fire(power);
                     } catch (GunOverheatedException | ExhaustedException e) {
-                        // Ignore
+                    }
+                }
+                
+                double bodyTurn = normalRelativeAngle(absoluteBearingRad - Math.toRadians(leader.getHeading()));
+                double bodyTurnDegrees = Math.abs(Math.toDegrees(bodyTurn));
+                
+                if (distance > 200) {
+                    try {
+                        leader.turnRobot(Math.toDegrees(bodyTurn));
+                        leader.move(Math.min(30, distance / 3));
+                    } catch (CollisionException | ExhaustedException e) {
+                        leader.turnRobot(90);
+                    }
+                } else if (distance < 100) {
+                    try {
+                        leader.turnRobot(Math.toDegrees(bodyTurn) + 90);
+                        leader.move(20);
+                    } catch (CollisionException | ExhaustedException e) {
+                        leader.turnRobot(-90);
+                    }
+                } else {
+                    try {
+                        double strafeAngle = normalRelativeAngle(absoluteBearingRad - Math.toRadians(leader.getHeading()) + Math.PI / 2);
+                        leader.turnRobot(Math.toDegrees(strafeAngle));
+                        leader.move(15);
+                    } catch (CollisionException | ExhaustedException e) {
+                        leader.turnRobot(90);
                     }
                 }
             } else {
                 hasTarget = false;
-            }
-            
-            // STEP 3: Move aggressively toward center
-            Location current = leader.getLocation();
-            int fieldWidth = FIELD_WIDTH;
-            int fieldHeight = FIELD_HEIGHT;
-            int centerX = fieldWidth / 2;
-            int centerY = fieldHeight / 2;
-            
-            double dx = centerX - current.getX();
-            double dy = centerY - current.getY();
-            double distanceToCenter = Math.hypot(dx, dy);
-            
-            if (distanceToCenter > 50) {
-                // Move toward center
-                double angleToCenter = Math.toDegrees(Math.atan2(dx, -dy));
-                if (angleToCenter < 0) angleToCenter += 360;
+                Location current = leader.getLocation();
+                int margin = 50;
                 
-                double currentHeading = leader.getHeading();
-                double turnAngle = angleToCenter - currentHeading;
-                if (turnAngle > 180) turnAngle -= 360;
-                if (turnAngle < -180) turnAngle += 360;
-                
-                try {
-                    leader.turnRobot(turnAngle); // Full turn for faster response
-                    leader.move(Math.min(50, distanceToCenter / 2)); // MUCH MORE AGGRESSIVE (50 max)
-                } catch (CollisionException | ExhaustedException e) {
-                    // Turn away on collision but keep moving aggressively
+                if (current.getX() < margin || current.getX() > FIELD_WIDTH - margin ||
+                    current.getY() < margin || current.getY() > FIELD_HEIGHT - margin) {
+                    double centerX = FIELD_WIDTH / 2.0;
+                    double centerY = FIELD_HEIGHT / 2.0;
+                    double dx = centerX - current.getX();
+                    double dy = centerY - current.getY();
+                    double angle = Math.toDegrees(Math.atan2(dx, -dy));
+                    if (angle < 0) angle += 360;
+                    double currentHeading = leader.getHeading();
+                    double turnAngle = angle - currentHeading;
+                    if (turnAngle > 180) turnAngle -= 360;
+                    if (turnAngle < -180) turnAngle += 360;
                     try {
-                        leader.turnRobot(90);
-                        leader.move(40); // Still move aggressively
-                    } catch (Exception ex) {
-                        // Try opposite direction
-                        try {
-                            leader.turnRobot(-90);
-                            leader.move(30);
-                        } catch (Exception ex2) {
-                            // Ignore
-                        }
-                    }
-                }
-            } else {
-                reachedCenter = true;
-                // Once at center, move in hunting pattern
-                if (moveCounter % 60 == 0) {
-                    double randomTurn = (Math.random() - 0.5) * 60; // -30 to +30 degrees
-                    try {
-                        leader.turnRobot(randomTurn);
-                        leader.move(10);
+                        leader.turnRobot(turnAngle);
+                        leader.move(20);
                     } catch (CollisionException | ExhaustedException e) {
                         leader.turnRobot(90);
+                    }
+                } else {
+                    if (moveCounter % 40 == 0) {
+                        double randomTurn = (Math.random() - 0.5) * 60;
+                        try {
+                            leader.turnRobot(randomTurn);
+                            leader.move(20);
+                        } catch (CollisionException | ExhaustedException e) {
+                            leader.turnRobot(90);
+                        }
+                    } else {
+                        try {
+                            leader.move(15);
+                        } catch (CollisionException | ExhaustedException e) {
+                            leader.turnRobot(90);
+                        }
                     }
                 }
             }
             
         } catch (ExhaustedException e) {
-            // Out of energy - just turn radar
             try {
                 leader.turnRadar(10.0 * radarDirection);
             } catch (Exception ex) {
-                // Ignore
             }
         }
     }

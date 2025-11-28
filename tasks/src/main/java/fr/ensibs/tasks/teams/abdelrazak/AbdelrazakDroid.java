@@ -115,46 +115,34 @@ public class AbdelrazakDroid implements RobotTask<Robot>
                 }
             }
         } else {
-            // No target - ALWAYS move toward center aggressively
             Location current = robot.getLocation();
-            double centerX = FIELD_WIDTH / 2.0;
-            double centerY = FIELD_HEIGHT / 2.0;
-            double dx = centerX - current.getX();
-            double dy = centerY - current.getY();
-            double distance = Math.hypot(dx, dy);
+            int margin = 50;
             
-            if (distance > 30) {
-                double absoluteBearingRad = Math.atan2(dx, -dy);
-                double bodyTurn = normalRelativeAngle(absoluteBearingRad - Math.toRadians(robot.getHeading()));
+            if (current.getX() < margin || current.getX() > FIELD_WIDTH - margin ||
+                current.getY() < margin || current.getY() > FIELD_HEIGHT - margin) {
+                double centerX = FIELD_WIDTH / 2.0;
+                double centerY = FIELD_HEIGHT / 2.0;
+                double dx = centerX - current.getX();
+                double dy = centerY - current.getY();
+                double angle = Math.toDegrees(Math.atan2(dx, -dy));
+                if (angle < 0) angle += 360;
+                double currentHeading = robot.getHeading();
+                double turnAngle = angle - currentHeading;
+                if (turnAngle > 180) turnAngle -= 360;
+                if (turnAngle < -180) turnAngle += 360;
                 try {
-                    robot.turnRobot(Math.toDegrees(bodyTurn));
-                    robot.move(Math.min(50, distance / 2)); // AGGRESSIVE toward center
+                    robot.turnRobot(turnAngle);
+                    robot.move(25);
                 } catch (CollisionException | ExhaustedException e) {
-                    try {
-                        robot.turnRobot(90);
-                        robot.move(40);
-                    } catch (Exception ex) {
-                        try {
-                            robot.turnRobot(-90);
-                            robot.move(30);
-                        } catch (Exception ex2) {
-                            // Ignore
-                        }
-                    }
+                    robot.turnRobot(90);
                 }
             } else {
-                // At center - move aggressively anyway (berserker)
+                double randomTurn = (Math.random() - 0.5) * 60;
                 try {
-                    double randomTurn = (Math.random() - 0.5) * 90;
                     robot.turnRobot(randomTurn);
-                    robot.move(40); // Large movement
+                    robot.move(25);
                 } catch (CollisionException | ExhaustedException e) {
-                    try {
-                        robot.turnRobot(90);
-                        robot.move(30);
-                    } catch (Exception ex) {
-                        // Ignore
-                    }
+                    robot.turnRobot(90);
                 }
             }
         }

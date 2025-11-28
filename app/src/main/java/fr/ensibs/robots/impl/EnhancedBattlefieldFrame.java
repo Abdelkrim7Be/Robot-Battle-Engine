@@ -789,13 +789,12 @@ public class EnhancedBattlefieldFrame extends JFrame
                                 engineStopped = true; // Update flag after stopping
                             }
                         } else if (teamsWithAliveRobots == 0) {
-                            // All teams eliminated - but only declare draw if engine is stopped
-                            // This prevents false draw during active combat when robots might be temporarily below MOTION_ENERGY
-                            if (engineStopped) {
-                                battleOver = true;
-                            } else {
-                                // Engine still running - might be temporary, don't declare draw yet
-                                battleOver = false;
+                            // All teams eliminated - battle is over (draw or winner by energy)
+                            battleOver = true;
+                            // Stop engine immediately when all teams are eliminated
+                            if (!engineStopped && engine != null) {
+                                engine.stop();
+                                engineStopped = true; // Update flag after stopping
                             }
                         } else {
                             // Multiple teams still alive - battle continues

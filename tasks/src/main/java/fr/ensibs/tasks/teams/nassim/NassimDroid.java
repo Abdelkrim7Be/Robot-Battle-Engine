@@ -143,16 +143,44 @@ public class NassimDroid implements RobotTask<Robot>
                 }
             }
         } else {
-            // No target - patrol
+            Location current = robot.getLocation();
             moveCounter++;
-            try {
-                robot.move(5);
+            int margin = 50;
+            
+            if (current.getX() < margin || current.getX() > 1280 - margin ||
+                current.getY() < margin || current.getY() > 960 - margin) {
+                double centerX = 1280 / 2.0;
+                double centerY = 960 / 2.0;
+                double dx = centerX - current.getX();
+                double dy = centerY - current.getY();
+                double angle = Math.toDegrees(Math.atan2(dx, -dy));
+                if (angle < 0) angle += 360;
+                double currentHeading = robot.getHeading();
+                double turnAngle = angle - currentHeading;
+                if (turnAngle > 180) turnAngle -= 360;
+                if (turnAngle < -180) turnAngle += 360;
+                try {
+                    robot.turnRobot(turnAngle);
+                    robot.move(20);
+                } catch (CollisionException | ExhaustedException e) {
+                    robot.turnRobot(90);
+                }
+            } else {
                 if (moveCounter % 40 == 0) {
                     double randomTurn = (Math.random() - 0.5) * 60;
-                    robot.turnRobot(randomTurn);
+                    try {
+                        robot.turnRobot(randomTurn);
+                        robot.move(20);
+                    } catch (CollisionException | ExhaustedException e) {
+                        robot.turnRobot(90);
+                    }
+                } else {
+                    try {
+                        robot.move(15);
+                    } catch (CollisionException | ExhaustedException e) {
+                        robot.turnRobot(90);
+                    }
                 }
-            } catch (CollisionException | ExhaustedException e) {
-                robot.turnRobot(90);
             }
         }
     }

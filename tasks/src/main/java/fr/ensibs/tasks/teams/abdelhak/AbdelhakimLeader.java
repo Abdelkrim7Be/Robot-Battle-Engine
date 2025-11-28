@@ -26,6 +26,7 @@ public class AbdelhakimLeader implements RobotTask<TeamLeader>
     private boolean hasTarget = false;
     private boolean inCorner = false;
     private int cornerX, cornerY;
+    private int moveCounter = 0;
     
     @Override
     public void setRobot(TeamLeader leader)
@@ -72,7 +73,7 @@ public class AbdelhakimLeader implements RobotTask<TeamLeader>
         }
         
         try {
-            // STEP 1: Spin radar continuously
+            moveCounter++;
             leader.turnRadar(10.0 * radarDirection);
             radarDirection *= -1;
             
@@ -164,9 +165,15 @@ public class AbdelhakimLeader implements RobotTask<TeamLeader>
                 hasTarget = false;
             }
             
-            // Minimal movement when in corner (defensive positioning)
-            if (inCorner) {
-                // Just hold position, minimal adjustments
+            if (inCorner && !hasTarget) {
+                if (moveCounter % 60 == 0) {
+                    try {
+                        double smallTurn = (Math.random() - 0.5) * 20;
+                        leader.turnRobot(smallTurn);
+                        leader.move(5);
+                    } catch (CollisionException | ExhaustedException e) {
+                    }
+                }
             }
             
         } catch (ExhaustedException e) {

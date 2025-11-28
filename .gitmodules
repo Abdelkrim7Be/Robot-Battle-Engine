@@ -1,6 +1,3 @@
 [submodule "api"]
 	path = api
-	url = https://forgens.univ-ubs.fr/gitlab/projectjava/api.git
-[submodule "libs"]
-	path = libs
-	url = https://forgens.univ-ubs.fr/gitlab/projectjava/libs.git
+	url = git@forgens.univ-ubs.fr:pooa/project/api.git

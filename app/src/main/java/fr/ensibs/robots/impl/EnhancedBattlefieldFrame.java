@@ -811,9 +811,10 @@ public class EnhancedBattlefieldFrame extends JFrame
                         System.out.println("[UI] ========================================");
                         System.out.println("[UI] BATTLE OVER DETECTED - Determining winner...");
                         System.out.println("[UI] Active robots remaining: " + activeCount);
+                        System.out.println("[UI] Battle over flag: " + battleOver + ", Engine stopped: " + engineStopped);
                         
                         String winnerTeam = determineWinnerTeam(views);
-                        System.out.println("[UI] Winner team determined: " + (winnerTeam != null ? winnerTeam : "NONE"));
+                        System.out.println("[UI] Winner team determined: " + (winnerTeam != null ? winnerTeam : "NONE (DRAW)"));
                         System.out.println("[UI] ========================================");
 
                         // CRITICAL: Only declare winner AFTER battle is completely over (engine stopped)
@@ -826,6 +827,7 @@ public class EnhancedBattlefieldFrame extends JFrame
                             }
                         }
 
+                        // Always show a popup - either winner or draw
                         if (winnerTeam != null && !winnerTeam.isEmpty()) {
                             System.out.println("[UI] *** WINNER ANNOUNCED: " + winnerTeam + " ***");
                             
@@ -839,16 +841,16 @@ public class EnhancedBattlefieldFrame extends JFrame
                             // Show winner popup
                             showWinnerPopup(winnerTeam, views);
                         } else {
-                            System.out.println("[UI] *** DRAW - NO WINNER ***");
+                            System.out.println("[UI] *** DRAW - ALL TEAMS ELIMINATED ***");
                             
                             // Announce in kill feed
                             if (controlsPanel != null) {
                                 controlsPanel.addKillFeed("");
-                                controlsPanel.addKillFeed(">>> DRAW - NO WINNER <<<");
+                                controlsPanel.addKillFeed(">>> DRAW - ALL TEAMS ELIMINATED <<<");
                                 controlsPanel.addKillFeed("");
                             }
                             
-                            // Show draw popup
+                            // Show draw popup - CRITICAL: Always show popup even if winner is null
                             showDrawPopup(views);
                         }
                         
@@ -919,25 +921,34 @@ public class EnhancedBattlefieldFrame extends JFrame
                     if (view == null || view.getRobot() == null) continue;
                     String teamName = extractTeamName(view.getName());
                     int energy = (int) view.getRobot().getEnergy();
-                    if (energy > 0) { // Only count robots with energy > 0
+                    // Count all robots with energy >= 0 (including those with 0 energy)
+                    // This ensures we can determine a winner even if all are exhausted
+                    if (energy >= 0) {
                         teamEnergyTotal.put(teamName, teamEnergyTotal.getOrDefault(teamName, 0) + energy);
                     }
                 }
                 
                 if (teamEnergyTotal.isEmpty()) {
-                    System.out.println("[UI] No teams with any energy - true draw");
-                    return null; // True draw - all robots dead
+                    System.out.println("[UI] No teams found at all - true draw");
+                    return null; // True draw - no robots found
                 }
                 
-                // Find team with highest energy
+                // Find team with highest energy (even if all are 0, we'll still have a result)
                 String winner = null;
-                int maxEnergy = -1;
+                int maxEnergy = Integer.MIN_VALUE;
                 for (java.util.Map.Entry<String, Integer> entry : teamEnergyTotal.entrySet()) {
                     if (entry.getValue() > maxEnergy) {
                         maxEnergy = entry.getValue();
                         winner = entry.getKey();
                     }
                 }
+                
+                // If all teams have 0 energy, it's a draw
+                if (maxEnergy <= 0) {
+                    System.out.println("[UI] All teams have zero or negative energy - true draw");
+                    return null; // True draw - all robots dead/exhausted
+                }
+                
                 System.out.println("[UI] Winner by energy: " + winner + " (Total: " + maxEnergy + ")");
                 return winner;
             }

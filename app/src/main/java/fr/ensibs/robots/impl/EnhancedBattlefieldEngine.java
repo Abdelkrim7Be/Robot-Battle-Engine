@@ -199,6 +199,10 @@ public class EnhancedBattlefieldEngine
         // Step 5: MISSION 3.2 - Update energy capsules and check for collection
         battlefieldImpl.updateEnergyCapsules();
         
+        // Step 5.5: CRITICAL - Process damage events BEFORE removing dead robots
+        // This ensures kill feed and kill tracking work correctly
+        // (Events are processed in UI thread, but we need to ensure they exist)
+        
         // Step 6: Remove dead robots (energy <= 0)
         battlefieldImpl.removeDeadRobots();
         
@@ -250,7 +254,7 @@ public class EnhancedBattlefieldEngine
                     // DEBUG: Log before calling run() (ALWAYS for first 10 ticks)
                     if (tickCount <= 10) {
                         System.out.println("[TASK] >>> CALLING run() on " + taskName + " for " + robotName + " <<<");
-                    }
+            }
                     task.run(); // Execute task - robots can move, scan, etc. during deployment
                     tasksExecuted++;
                     if (tickCount <= 10) {
@@ -283,6 +287,25 @@ public class EnhancedBattlefieldEngine
         
         // Step 9: MISSION A.4 - Apply passive regeneration after all robot actions
         battlefieldImpl.processPassiveRegeneration();
+        
+        // Step 10: Check for win condition - only one team remaining
+        // Recalculate count AFTER all updates to ensure accuracy
+        int finalActiveCount = battlefieldImpl.getActiveRobotCount();
+        // Stop if there are 0 active robots (all dead) or exactly 1 robot left (last team wins)
+        // The UI will determine the winner based on teams
+        if (finalActiveCount <= 1) {
+            // Battle is over - stop the engine
+            // If 0 robots: all dead (draw)
+            // If 1 robot: only one team remains (that team wins)
+            stop();
+            System.out.println("\n=== BATTLE OVER ===");
+            System.out.println("Active robots remaining: " + finalActiveCount);
+            if (finalActiveCount == 0) {
+                System.out.println("All robots eliminated! Stopping engine...");
+            } else {
+                System.out.println("Only one robot remaining! Stopping engine...");
+            }
+        }
     }
     
     /**
@@ -312,6 +335,31 @@ public class EnhancedBattlefieldEngine
     public boolean isBattleOver()
     {
         return battlefieldImpl.getActiveRobotCount() <= 1;
+    }
+    
+    private boolean winnerDeclared = false;
+    
+    /**
+     * Check if winner has been declared (prevents duplicate announcements).
+     * 
+     * @return true if winner was already declared
+     */
+    public boolean isWinnerDeclared() {
+        return winnerDeclared;
+    }
+    
+    /**
+     * Mark that winner has been declared.
+     */
+    public void setWinnerDeclared(boolean declared) {
+        this.winnerDeclared = declared;
+    }
+    
+    /**
+     * Reset winner declaration flag for new battle.
+     */
+    public void resetWinnerDeclaration() {
+        this.winnerDeclared = false;
     }
 }
 

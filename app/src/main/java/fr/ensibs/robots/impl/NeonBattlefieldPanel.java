@@ -52,6 +52,8 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
     // MISSION 4.2: Kill feed announcements
     private String lastKillAnnouncement; // Last kill streak announcement
     
+    // Winner announcement - removed, only shown in kill feed
+    
     // Rendering optimization
     private long lastFrameTime = System.nanoTime();
     private double currentFPS = 60.0;
@@ -146,7 +148,8 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         
         // MISSION B: Draw phase indicator
         drawPhaseIndicator(g2d);
-        drawBattleOutcomeOverlay(g2d);
+        
+        // Winner announcement removed - only shown in kill feed
     }
     
     /**
@@ -260,11 +263,24 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 double bodyHeading = robot.getHeading();
                 gRobot.rotate(Math.toRadians(bodyHeading - 90));
                 
+                // Check if this is a Leader - Leaders are larger and have special styling
+                boolean isLeader = robot instanceof fr.ensibs.robots.logic.TeamLeader;
+                int bodySize = isLeader ? 50 : 40; // Leaders are 25% larger
+                int halfSize = bodySize / 2;
+                
                 // Draw Body: Filled Rectangle at (0,0) after translate
                 gRobot.setColor(teamColor);
-                gRobot.fillRect(-20, -20, 40, 40); // Body
+                gRobot.fillRect(-halfSize, -halfSize, bodySize, bodySize); // Body
                 gRobot.setColor(Color.BLACK);
-                gRobot.drawRect(-20, -20, 40, 40); // Outline
+                gRobot.drawRect(-halfSize, -halfSize, bodySize, bodySize); // Outline
+                
+                // Leaders get a thicker outline and inner highlight
+                if (isLeader) {
+                    gRobot.setStroke(new BasicStroke(3.0f));
+                    gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 150));
+                    gRobot.drawRect(-halfSize + 3, -halfSize + 3, bodySize - 6, bodySize - 6); // Inner highlight
+                    gRobot.setStroke(new BasicStroke(1.0f));
+                }
                 
                 // Reset rotation for gun
                 gRobot.setTransform(battlefieldG.getTransform());
@@ -275,7 +291,60 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                 // Draw Gun: Rectangle at (0,0) after translate
                 gRobot.setColor(Color.WHITE);
                 gRobot.setStroke(new BasicStroke(3.0f));
-                gRobot.drawLine(0, 0, 35, 0); // Gun barrel
+                int gunLength = isLeader ? 45 : 35; // Leaders have longer gun
+                gRobot.drawLine(0, 0, gunLength, 0); // Gun barrel
+                
+                // Draw Radar for Leaders only - Enhanced visualization
+                if (isLeader) {
+                    // Reset transform for radar (radar is mounted on gun, so use gun heading)
+                    gRobot.setTransform(battlefieldG.getTransform());
+                    gRobot.translate(x, y);
+                    double radarHeading = robot.getGunHeading(); // Radar is mounted on gun
+                    gRobot.rotate(Math.toRadians(radarHeading - 90));
+                    
+                    // Draw radar sweep arc (animated effect)
+                    int radarRadius = 30;
+                    int radarSweepAngle = 45; // 45 degrees sweep on each side
+                    gRobot.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    gRobot.setStroke(new BasicStroke(2.0f));
+                    gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 100)); // Semi-transparent
+                    // Draw sweep arc
+                    gRobot.drawArc(-radarRadius, -radarRadius, radarRadius * 2, radarRadius * 2, 
+                                   -radarSweepAngle, radarSweepAngle * 2);
+                    
+                    // Draw radar dish as a larger triangle pointing in scan direction
+                    gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 220)); // Semi-transparent
+                    gRobot.setStroke(new BasicStroke(2.5f));
+                    // Larger triangle for Leaders
+                    int[] xPoints = {0, -12, 12};
+                    int[] yPoints = {-halfSize - 5, -halfSize + 5, -halfSize + 5}; // Positioned above robot body
+                    gRobot.fillPolygon(xPoints, yPoints, 3);
+                    gRobot.setColor(teamColor);
+                    gRobot.drawPolygon(xPoints, yPoints, 3);
+                    
+                    // Draw radar center dot
+                    gRobot.setColor(Color.CYAN);
+                    gRobot.fillOval(-3, -halfSize - 5, 6, 6);
+                    
+                    // Draw crown/star icon above Leader
+                    gRobot.setTransform(battlefieldG.getTransform());
+                    gRobot.translate(x, y - halfSize - 20);
+                    gRobot.setColor(new Color(255, 215, 0)); // Gold color for crown
+                    gRobot.setFont(new Font("Monospaced", Font.BOLD, 16));
+                    FontMetrics fm = gRobot.getFontMetrics();
+                    String crown = "★"; // Star symbol for leader
+                    int textWidth = fm.stringWidth(crown);
+                    gRobot.drawString(crown, -textWidth / 2, 0);
+                    
+                    // Draw "LEADER" label below crown
+                    gRobot.translate(0, 15);
+                    gRobot.setColor(Color.WHITE);
+                    gRobot.setFont(new Font("Monospaced", Font.BOLD, 10));
+                    fm = gRobot.getFontMetrics();
+                    String label = "LEADER";
+                    textWidth = fm.stringWidth(label);
+                    gRobot.drawString(label, -textWidth / 2, 0);
+                }
             } finally {
                 gRobot.dispose();
             }
@@ -428,11 +497,11 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
                     gRobot.rotate(Math.toRadians(bodyHeading - 90));
                 } else {
                     // DROID: Standard square shape
-                    gRobot.setColor(teamColor);
-                    gRobot.setStroke(new BasicStroke(3));
-                    gRobot.drawRect(-20, -20, 40, 40); // Outline at (0,0) relative to robot
-                    gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 200));
-                    gRobot.fillRect(-20, -20, 40, 40); // Fill at (0,0)
+                gRobot.setColor(teamColor);
+                gRobot.setStroke(new BasicStroke(3));
+                gRobot.drawRect(-20, -20, 40, 40); // Outline at (0,0) relative to robot
+                gRobot.setColor(new Color(teamColor.getRed(), teamColor.getGreen(), teamColor.getBlue(), 200));
+                gRobot.fillRect(-20, -20, 40, 40); // Fill at (0,0)
                 }
                 
                 // Reset rotation for gun
@@ -605,47 +674,7 @@ public class NeonBattlefieldPanel extends BattlefieldPanel
         }
     }
     
-    /**
-     * Display a victory or draw message when the battle is over.
-     */
-    private void drawBattleOutcomeOverlay(Graphics2D g2d)
-    {
-        List<DroidView<? extends Droid>> views = getViews();
-        List<DroidView<? extends Droid>> alive = new ArrayList<>();
-        for (DroidView<? extends Droid> view : views) {
-            if (view.getRobot().getEnergy() > 0) {
-                alive.add(view);
-            }
-        }
-        
-        if (alive.size() > 1 || views.isEmpty()) {
-            return;
-        }
-        
-        String message = alive.isEmpty()
-            ? "DRAW – ALL UNITS DESTROYED"
-            : "VICTORY – " + alive.get(0).getName();
-        
-        g2d.setFont(new Font("Monospaced", Font.BOLD, 32));
-        FontMetrics metrics = g2d.getFontMetrics();
-        int textWidth = metrics.stringWidth(message);
-        int textHeight = metrics.getHeight();
-        int x = (getWidth() - textWidth) / 2;
-        int y = getHeight() / 2;
-        
-        g2d.setColor(new Color(0, 0, 0, 180));
-        g2d.fillRoundRect(
-            x - 30,
-            y - metrics.getAscent() - 30,
-            textWidth + 60,
-            textHeight + 60,
-            20,
-            20
-        );
-        
-        g2d.setColor(new Color(0, 255, 0));
-        g2d.drawString(message, x, y);
-    }
+    // Winner announcement methods removed - only shown in kill feed
     
     /**
      * Get views list - use direct reference instead of reflection.

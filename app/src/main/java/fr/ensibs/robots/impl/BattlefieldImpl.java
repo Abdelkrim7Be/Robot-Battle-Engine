@@ -44,6 +44,9 @@ class BattlefieldImpl implements Battlefield
     // MISSION F: Damage number manager
     private final DamageNumberManager damageNumberManager = new DamageNumberManager();
     
+    // Speed multiplier: 0.5 = 50% speed (half speed for better visibility)
+    private static final double SPEED_MULTIPLIER = 0.5;
+    
     // MISSION B: Phase manager reference
     private GamePhaseManager phaseManager;
     
@@ -69,17 +72,19 @@ class BattlefieldImpl implements Battlefield
         final int damage;
         final boolean isDeath;
         final BaseDroid killer; // MISSION 4.2: Track killer for kill feed
-        DamageEvent(int dmg, boolean death, BaseDroid killer) { 
+        final BaseDroid victim; // Track victim for kill feed
+        DamageEvent(int dmg, boolean death, BaseDroid killer, BaseDroid victim) { 
             damage = dmg; 
             isDeath = death;
             this.killer = killer;
+            this.victim = victim;
         }
     }
     private final List<DamageEvent> recentDamageEvents = new ArrayList<>();
     
     // DEBUG: Counter for move() calls (to limit logging)
     private static int moveCallCount = 0;
-    
+
     void register(BaseDroid droid)
     {
         robots.add(droid);
@@ -234,7 +239,7 @@ class BattlefieldImpl implements Battlefield
         
         return false;
     }
-    
+
     private static double distanceSquared(Location a, Location b)
     {
         double dx = a.getX() - b.getX();
@@ -488,8 +493,12 @@ class BattlefieldImpl implements Battlefield
                     String victimName = robot.getClass().getSimpleName();
                     System.out.println("HIT! " + attackerName + " -> " + victimName + " for " + damage + " damage! (Energy: " + energyAfter + "/" + energyBefore + ")");
                     
+                    // CRITICAL DEBUG: Death detection
                     if (isDeath) {
-                        System.out.println("KILLED! " + victimName + " is dead!");
+                        System.out.println("========================================");
+                        System.out.println("DEBUG: Robot [" + victimName + "] DIED");
+                        System.out.println("DEBUG: Killed by [" + attackerName + "]");
+                        System.out.println("DEBUG: Energy before: " + energyBefore + ", after: " + energyAfter);
                     }
                     
                     // MISSION F: Add floating damage number
@@ -500,7 +509,25 @@ class BattlefieldImpl implements Battlefield
                     
                     // MISSION 4.2: Track kill (kill streak is tracked internally, announcements handled by caller)
                     if (isDeath) {
-                        damageTracker.recordKill(attacker);
+                        // CRITICAL: Record kill BEFORE getting count
+                        int killsBefore = damageTracker.getKills(attacker);
+                        int killStreak = damageTracker.recordKill(attacker);
+                        int totalKills = damageTracker.getKills(attacker);
+                        
+                        System.out.println("DEBUG: Incrementing [" + attackerName + "] kills from " + killsBefore + " to " + totalKills);
+                        System.out.println("[BATTLEFIELD] *** KILL RECORDED *** " + attackerName + 
+                                          " (hash: " + System.identityHashCode(attacker) + ") killed " + 
+                                          victimName + " (hash: " + System.identityHashCode(robot) + ")" +
+                                          " (Total kills: " + totalKills + ", Streak: " + killStreak + ")");
+                        
+                        // Verify kill was recorded
+                        int verifyKills = damageTracker.getKills(attacker);
+                        if (verifyKills != totalKills) {
+                            System.err.println("[BATTLEFIELD] ERROR: Kill count mismatch! Expected " + totalKills + " but got " + verifyKills);
+                        } else {
+                            System.out.println("DEBUG: Kill verification PASSED - " + attackerName + " now has " + verifyKills + " kills");
+                        }
+                        System.out.println("========================================");
                     }
                     
                     // PHASE 4: Track hit event for visual effects (impact particles)
@@ -508,9 +535,16 @@ class BattlefieldImpl implements Battlefield
                     recentHits.add(new HitEvent(bulletLoc, hitColor));
                     
                     // MISSION 2.1: Track damage for camera shake (>10 damage or death)
-                    // MISSION 4.2: Include killer info for kill feed
-                    if (damage > 10 || isDeath) {
-                        recentDamageEvents.add(new DamageEvent(damage, isDeath, attacker));
+                    // MISSION 4.2: Include killer and victim info for kill feed
+                    // CRITICAL: Always add death events to ensure kill feed is populated
+                    if (isDeath) {
+                        // Death event - always add with killer and victim
+                        recentDamageEvents.add(new DamageEvent(damage, true, attacker, robot));
+                        System.out.println("[BATTLEFIELD] DEATH EVENT ADDED: " + attackerName + " -> " + victimName);
+                        System.out.println("[BATTLEFIELD] Total death events in queue: " + recentDamageEvents.size());
+                    } else if (damage > 10) {
+                        // High damage event (for camera shake)
+                        recentDamageEvents.add(new DamageEvent(damage, false, attacker, robot));
                     }
                     
                     bullet.deactivate();
@@ -545,8 +579,17 @@ class BattlefieldImpl implements Battlefield
                 robots.removeIf(robot -> {
                     boolean isDead = robot.getEnergy() <= 0;
                     if (isDead) {
-                        // Track death event for camera shake (no killer for natural deaths)
-                        recentDamageEvents.add(new DamageEvent(100, true, null)); // 100 = death intensity
+                        // CRITICAL: Only add death event if no killer was already recorded
+                        // (killer-based deaths are already recorded in detectCollisions)
+                        // Check if this robot already has a death event with a killer
+                        boolean alreadyHasKillerEvent = recentDamageEvents.stream()
+                            .anyMatch(e -> e.isDeath && e.victim == robot && e.killer != null);
+                        
+                        if (!alreadyHasKillerEvent) {
+                            // Natural death (no killer) - only add if not already recorded
+                            recentDamageEvents.add(new DamageEvent(100, true, null, robot)); // 100 = death intensity
+                            System.out.println("[BATTLEFIELD] Natural death event added for: " + robot.getClass().getSimpleName());
+                        }
                 
                 // MISSION 4.2: Reset kill streak when robot dies
                 damageTracker.resetKillStreak(robot);
@@ -719,6 +762,17 @@ class BattlefieldImpl implements Battlefield
     }
     
     /**
+     * Get the list of robots on the battlefield.
+     * Used for matching robot instances between views and battlefield.
+     * 
+     * @return list of robots (copy for safety)
+     */
+    List<BaseDroid> getRobots()
+    {
+        return new ArrayList<>(robots); // Return a copy for safety
+    }
+    
+    /**
      * MISSION 4.2: Get kill streak for kill feed announcements.
      * Should be called when a kill occurs.
      * 
@@ -728,6 +782,18 @@ class BattlefieldImpl implements Battlefield
     int getKillStreak(Droid killer)
     {
         return damageTracker.getKillStreak(killer);
+    }
+    
+    /**
+     * MISSION 4.2: Get kill count for a robot.
+     * This is a convenience method that delegates to DamageTracker.
+     * 
+     * @param robot the robot
+     * @return kill count
+     */
+    int getKills(Droid robot)
+    {
+        return damageTracker.getKills(robot);
     }
     
     /**
@@ -743,15 +809,31 @@ class BattlefieldImpl implements Battlefield
     }
     
     /**
-     * Get the number of active (alive) robots on the battlefield.
+     * Get recent damage events without clearing them (for sharing between UI components).
      * 
-     * @return the count of robots with energy > 0
+     * @return list of damage events (damage amount and whether it was a death)
+     */
+    List<DamageEvent> getRecentDamageEvents()
+    {
+        return new ArrayList<>(recentDamageEvents);
+    }
+    
+    /**
+     * Get the number of active (alive) robots on the battlefield.
+     * A robot is considered "active" if it has enough energy to move (energy >= MOTION_ENERGY).
+     * 
+     * @return the count of robots with energy >= MOTION_ENERGY
      */
     int getActiveRobotCount()
     {
-        return (int) robots.stream()
-            .filter(robot -> robot.getEnergy() > 0)
+        int count = (int) robots.stream()
+            .filter(robot -> robot.getEnergy() >= BattleSetup.MOTION_ENERGY)
             .count();
+        // Debug: Log count periodically
+        if (System.currentTimeMillis() % 2000 < 16) { // Roughly every 2 seconds
+            System.out.println("[BATTLEFIELD] Active robot count: " + count + " (total robots: " + robots.size() + ")");
+        }
+        return count;
     }
     
     /**
@@ -862,7 +944,9 @@ class BattlefieldImpl implements Battlefield
             System.out.println("[MOVE] move(" + distance + ") called on " + robot.getClass().getSimpleName() + " at " + robot.getLocation());
         }
         BaseDroid mover = requireDroid(robot);
-        double limitedDistance = Math.max(BattleSetup.MIN_DISTANCE_MOVE, Math.min(BattleSetup.MAX_DISTANCE_MOVE, distance));
+        // Apply speed multiplier to reduce movement speed
+        double adjustedDistance = distance * SPEED_MULTIPLIER;
+        double limitedDistance = Math.max(BattleSetup.MIN_DISTANCE_MOVE, Math.min(BattleSetup.MAX_DISTANCE_MOVE, adjustedDistance));
         if (limitedDistance == 0) {
             if (moveCallCount <= 20) {
                 System.out.println("[MOVE] Limited distance is 0, returning");

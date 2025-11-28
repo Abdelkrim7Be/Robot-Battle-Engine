@@ -40,8 +40,9 @@ class Bullet
     /**
      * Bullet speed in pixels per game tick.
      * Higher power bullets travel faster.
+     * Reduced by 50% for better visibility.
      */
-    private static final double BASE_BULLET_SPEED = 20.0; // pixels per tick
+    private static final double BASE_BULLET_SPEED = 10.0; // pixels per tick (reduced from 20.0)
     
     /**
      * Default constructor for object pooling.

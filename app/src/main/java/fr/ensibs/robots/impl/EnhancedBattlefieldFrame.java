@@ -75,13 +75,14 @@ public class EnhancedBattlefieldFrame extends JFrame
         neonPanel = new NeonBattlefieldPanel(views);
         mainPanel.add(neonPanel, BorderLayout.CENTER);
 
-        // Dashboard on the left
-        dashboard = new BattleDashboard();
-        dashboard.setPreferredSize(new Dimension(250, 0));
-        mainPanel.add(dashboard, BorderLayout.WEST);
+        // REMOVED: Dashboard on the left - user requested removal
+        // dashboard = new BattleDashboard();
+        // dashboard.setPreferredSize(new Dimension(250, 0));
+        // mainPanel.add(dashboard, BorderLayout.WEST);
 
-        // the controls on the right
+        // the controls on the right - made wider and more informative
         controlsPanel = new ControlsPanel(views, factory, taskFactory);
+        controlsPanel.setPreferredSize(new Dimension(400, 0)); // Wider panel
         mainPanel.add(controlsPanel, BorderLayout.EAST);
         
         // Create EnhancedBattlefieldEngine which handles full game loop (bullets, collisions, etc.)
@@ -100,7 +101,8 @@ public class EnhancedBattlefieldFrame extends JFrame
         setLocationRelativeTo(null);
         
         // Start graphic engine at 60 FPS (16ms period)
-        graphicEngine = new EnhancedGraphicEngine(neonPanel, dashboard, battlefield, views);
+        // Note: dashboard is null now (removed per user request)
+        graphicEngine = new EnhancedGraphicEngine(neonPanel, null, battlefield, views, engine, controlsPanel);
         graphicEngine.start(16); // ~60 FPS for smooth rendering
     }
     
@@ -113,6 +115,24 @@ public class EnhancedBattlefieldFrame extends JFrame
     {
         // Clear existing robots
         clearBattlefield();
+        
+        // CRITICAL: Clear kill feed and reset winner declaration when starting new battle
+        if (controlsPanel != null) {
+            controlsPanel.resetBattle();
+            System.out.println("[BATTLE] Kill feed cleared for new battle");
+        }
+        if (engine != null) {
+            engine.resetWinnerDeclaration();
+            System.out.println("[BATTLE] Winner declaration reset for new battle");
+        }
+        
+        // CRITICAL: Reset damage tracker when starting new battle
+        if (battlefield instanceof BattlefieldImpl) {
+            BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+            DamageTracker tracker = impl.getDamageTracker();
+            tracker.reset();
+            System.out.println("[BATTLE] Damage tracker reset for new battle");
+        }
         
         System.out.println("\n========================================");
         System.out.println("=== STARTING BATTLE WITH " + teams.size() + " TEAMS ===");
@@ -496,22 +516,28 @@ public class EnhancedBattlefieldFrame extends JFrame
     /**
      * Enhanced graphic engine that also updates particles, bullets, and dashboard.
      */
-    private static class EnhancedGraphicEngine extends GraphicEngine
+    private class EnhancedGraphicEngine extends GraphicEngine
     {
         private final NeonBattlefieldPanel panel;
         private final BattleDashboard dashboard;
         private final fr.ensibs.robots.logic.Battlefield battlefield;
         private final List<DroidView<? extends Droid>> views;
+        private final EnhancedBattlefieldEngine engine;
+        private final ControlsPanel controlsPanel;
         
         EnhancedGraphicEngine(NeonBattlefieldPanel panel, BattleDashboard dashboard,
                              fr.ensibs.robots.logic.Battlefield battlefield,
-                             List<DroidView<? extends Droid>> views)
+                             List<DroidView<? extends Droid>> views,
+                             EnhancedBattlefieldEngine engine,
+                             ControlsPanel controlsPanel)
         {
             super(panel);
             this.panel = panel;
             this.dashboard = dashboard;
             this.battlefield = battlefield;
             this.views = views;
+            this.engine = engine;
+            this.controlsPanel = controlsPanel;
         }
         
         @Override
@@ -519,25 +545,594 @@ public class EnhancedBattlefieldFrame extends JFrame
         {
             if (getTimer() == null) {
                 javax.swing.Timer timer = new javax.swing.Timer(period, (e) -> {
+                    // CRITICAL: Process kill feed events FIRST, before panel.syncBullets() clears them
+                    // Update kills map and kill feed with damage events from battlefield
+                    if (controlsPanel != null && !views.isEmpty() && battlefield instanceof BattlefieldImpl) {
+                        BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+                        DamageTracker tracker = impl.getDamageTracker();
+                        
+                        // Update kill feed with damage events FIRST (before panel clears them)
+                        List<BattlefieldImpl.DamageEvent> damageEvents = impl.getAndClearRecentDamageEvents();
+                        
+                        if (!damageEvents.isEmpty()) {
+                            System.out.println("[KILL FEED] ========================================");
+                            System.out.println("[KILL FEED] Processing " + damageEvents.size() + " damage events");
+                        }
+                        
+                        for (BattlefieldImpl.DamageEvent event : damageEvents) {
+                            if (event.isDeath) {
+                                System.out.println("[KILL FEED] Death event: killer=" + (event.killer != null ? event.killer.getClass().getSimpleName() : "null") + 
+                                                  ", victim=" + (event.victim != null ? event.victim.getClass().getSimpleName() : "null"));
+                                
+                                // Process both killer-based deaths and natural deaths
+                                if (event.killer != null) {
+                                    // Find killer name from views
+                                    String killerName = findRobotName(views, event.killer);
+                                    
+                                    if (killerName != null) {
+                                        // Get kill streak
+                                        int killStreak = impl.getKillStreak(event.killer);
+                                        
+                                        // Extract victim name from event if available
+                                        String victimName = "Enemy";
+                                        if (event.victim != null) {
+                                            String foundVictim = findRobotName(views, event.victim);
+                                            if (foundVictim != null) {
+                                                victimName = foundVictim;
+                                            } else {
+                                                // Fallback: use class name if view not found
+                                                victimName = event.victim.getClass().getSimpleName();
+                                            }
+                                        }
+                                        
+                                        System.out.println("[KILL FEED] Adding kill: " + killerName + " -> " + victimName + " (streak: " + killStreak + ")");
+                                        System.out.println("DEBUG: Kill feed adding message: [" + killerName + " eliminated " + victimName + "]");
+                                        controlsPanel.addKillEvent(killerName, victimName, killStreak);
+                                        System.out.println("DEBUG: Kill feed message added successfully");
+                                        
+                                        // Check for team elimination after this kill
+                                        checkTeamElimination(views, event.victim);
+                                    } else {
+                                        System.out.println("[KILL FEED] WARNING: Killer not found in views: " + event.killer.getClass().getSimpleName());
+                                        // Try to add anyway with class name
+                                        String fallbackKillerName = event.killer.getClass().getSimpleName();
+                                        String fallbackVictimName = event.victim != null ? 
+                                            (findRobotName(views, event.victim) != null ? findRobotName(views, event.victim) : event.victim.getClass().getSimpleName()) : "Enemy";
+                                        int killStreak = impl.getKillStreak(event.killer);
+                                        controlsPanel.addKillEvent(fallbackKillerName, fallbackVictimName, killStreak);
+                                    }
+                                } else if (event.victim != null) {
+                                    // Natural death (no killer) - still log it
+                                    String victimName = findRobotName(views, event.victim);
+                                    if (victimName == null) {
+                                        victimName = event.victim.getClass().getSimpleName();
+                                    }
+                                    System.out.println("[KILL FEED] " + victimName + " died (natural death - no killer)");
+                                    // Don't add to kill feed for natural deaths (no killer)
+                                    
+                                    // Still check for team elimination even for natural deaths
+                                    checkTeamElimination(views, event.victim);
+                                }
+                            }
+                        }
+                        
+                        // Build kills map for ALL robots (including dead ones from views)
+                        // This ensures kills are displayed even if robots are removed from battlefield
+                        java.util.Map<Droid, Integer> killsMap = new java.util.HashMap<>();
+                        int totalKills = 0;
+                        int robotsChecked = 0;
+                        int robotsWithKills = 0;
+                        
+                        // CRITICAL: Get kills for all robots from views
+                        // The DamageTracker stores kills by robot instance, so we need to match
+                        // the robot instances from views to the ones in the battlefield's robots list
+                        // The views may have different instances, so we need to find the matching robot
+                        // in the battlefield's robots list by comparing identity or location
+                        
+                        // Get robots from battlefield (these are the actual instances used in DamageTracker)
+                        List<BaseDroid> battlefieldRobots = impl.getRobots();
+                        
+                        for (DroidView<? extends Droid> view : views) {
+                            if (view != null && view.getRobot() != null) {
+                                Droid viewRobot = view.getRobot();
+                                robotsChecked++;
+                                
+                                // Find matching robot in battlefield's robots list
+                                // Try identity match first (same instance)
+                                BaseDroid battlefieldRobot = null;
+                                for (BaseDroid bfRobot : battlefieldRobots) {
+                                    if (bfRobot == viewRobot) {
+                                        battlefieldRobot = bfRobot;
+                                        break;
+                                    }
+                                }
+                                
+                                // If not found by identity, try to match by location and class
+                                if (battlefieldRobot == null) {
+                                    fr.ensibs.robots.logic.Location viewLoc = viewRobot.getLocation();
+                                    for (BaseDroid bfRobot : battlefieldRobots) {
+                                        if (bfRobot.getClass() == viewRobot.getClass()) {
+                                            fr.ensibs.robots.logic.Location bfLoc = bfRobot.getLocation();
+                                            if (bfLoc != null && viewLoc != null && 
+                                                Math.abs(bfLoc.getX() - viewLoc.getX()) < 5 &&
+                                                Math.abs(bfLoc.getY() - viewLoc.getY()) < 5) {
+                                                battlefieldRobot = bfRobot;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Use battlefield robot if found, otherwise fall back to view robot
+                                Droid robotToQuery = (battlefieldRobot != null) ? battlefieldRobot : viewRobot;
+                                
+                                // Get kills from tracker using the correct robot instance
+                                int kills = impl.getKills(robotToQuery);
+                                
+                                // Also try direct tracker access as fallback
+                                if (kills == 0) {
+                                    kills = tracker.getKills(robotToQuery);
+                                }
+                                
+                                // CRITICAL FIX: If still 0, try to find kills by matching all battlefield robots
+                                // This handles cases where instance matching fails
+                                if (kills == 0 && !battlefieldRobots.isEmpty()) {
+                                    // Try to find robot by class name and approximate location
+                                    String viewRobotClassName = viewRobot.getClass().getSimpleName();
+                                    fr.ensibs.robots.logic.Location viewLoc = viewRobot.getLocation();
+                                    
+                                    for (BaseDroid bfRobot : battlefieldRobots) {
+                                        if (bfRobot.getClass().getSimpleName().equals(viewRobotClassName)) {
+                                            fr.ensibs.robots.logic.Location bfLoc = bfRobot.getLocation();
+                                            if (bfLoc != null && viewLoc != null) {
+                                                // Check if locations are close (within 50 pixels)
+                                                double dist = Math.hypot(bfLoc.getX() - viewLoc.getX(), bfLoc.getY() - viewLoc.getY());
+                                                if (dist < 50) {
+                                                    int bfKills = tracker.getKills(bfRobot);
+                                                    if (bfKills > 0) {
+                                                        kills = bfKills;
+                                                        System.out.println("[KILLS UPDATE] Found kills by location match: " + view.getName() + " -> " + kills + " kills");
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Store kills using view robot as key (for UI display)
+                                killsMap.put(viewRobot, kills);
+                                
+                                // Also store by name as fallback for UI lookup
+                                String robotName = view.getName();
+                                if (robotName != null && kills > 0) {
+                                    // Update name-based map in controlsPanel
+                                    if (controlsPanel != null) {
+                                        java.util.Map<String, Integer> nameMap = new java.util.HashMap<>();
+                                        nameMap.put(robotName, kills);
+                                        controlsPanel.updateKillsByNameMap(nameMap);
+                                    }
+                                }
+                                
+                                if (kills > 0) {
+                                    robotsWithKills++;
+                                    totalKills += kills;
+                                    System.out.println("[KILLS UPDATE] ✓ " + view.getName() + " has " + kills + " kills (view hash: " + System.identityHashCode(viewRobot) + ", battlefield hash: " + (battlefieldRobot != null ? System.identityHashCode(battlefieldRobot) : "null") + ")");
+                                }
+                            }
+                        }
+                        
+                        // Debug: Log summary every 60 frames (1 second)
+                        if (System.currentTimeMillis() % 1000 < 16) {
+                            System.out.println("[KILLS UPDATE] Summary: Checked " + robotsChecked + " robots, " + robotsWithKills + " with kills, total kills: " + totalKills);
+                        }
+                        
+                        // CRITICAL: Always update the map, even if empty, to ensure UI refresh
+                        controlsPanel.updateKillsMap(killsMap);
+                        
+                        // Force table refresh to show updated kills
+                        if (controlsPanel.robotsTable != null) {
+                            // Fire table data changed to force refresh
+                            controlsPanel.updateTable(); // Use public method instead
+                            controlsPanel.robotsTable.repaint();
+                        }
+                    }
+                    
                     // Update visual effects
+                    // NOTE: We've already processed damage events for kill feed above
+                    // The panel's syncBullets() will try to get events for camera shake, but they're already cleared
+                    // This is OK - camera shake can work without events, or we could pass events to panel
                     panel.syncBullets(battlefield);
                     panel.updateParticles();
                     
-                    // MISSION 4.2: Check for kill streak announcements
-                    String announcement = panel.getAndClearLastKillAnnouncement();
-                    if (announcement != null) {
-                        dashboard.addKillStreakAnnouncement(announcement);
+                    // Check for win condition (only once) - even if engine is stopped
+                    // CRITICAL: Check battlefield directly, not just engine state
+                    // CRITICAL: Only check if engine is actually stopped (battle truly over)
+                    boolean battleOver = false;
+                    int activeCount = -1;
+                    boolean engineStopped = (engine == null || engine.isBattleOver());
+                    
+                    if (battlefield instanceof BattlefieldImpl) {
+                        BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+                        activeCount = impl.getActiveRobotCount();
+                        // Battle is over when only 1 or 0 teams have alive robots
+                        // Check teams, not just robot count
+                        java.util.Map<String, Integer> teamAliveCount = new java.util.HashMap<>();
+                        for (DroidView<? extends Droid> view : views) {
+                            if (view == null || view.getRobot() == null) continue;
+                            Droid robot = view.getRobot();
+                            int energy = (int) robot.getEnergy();
+                            int motionEnergy = fr.ensibs.robots.logic.BattleSetup.MOTION_ENERGY;
+                            if (energy >= motionEnergy) {
+                                String teamName = extractTeamName(view.getName());
+                                teamAliveCount.put(teamName, teamAliveCount.getOrDefault(teamName, 0) + 1);
+                            }
+                        }
+                        // Battle is over when 0 or 1 teams have alive robots
+                        int teamsWithAliveRobots = teamAliveCount.size();
+                        
+                        // Debug: Log team counts periodically
+                        if (System.currentTimeMillis() % 1000 < 16) { // Roughly once per second
+                            System.out.println("[UI] Teams with alive robots: " + teamsWithAliveRobots + ", Active robots: " + activeCount + ", Engine stopped: " + engineStopped);
+                        }
+                        
+                        // Battle is over if only 1 team has alive robots (that team wins)
+                        // OR if 0 teams have alive robots (draw)
+                        // CRITICAL: Only check if engine is stopped OR if truly only 1 or 0 teams remain
+                        // Don't trigger during active combat when robots might be temporarily below MOTION_ENERGY
+                        if (teamsWithAliveRobots == 1 && activeCount > 0) {
+                            // Only one team left with alive robots AND there are active robots - battle is over, that team wins
+                            battleOver = true;
+                            // Stop engine if still running
+                            if (!engineStopped && engine != null && !engine.isBattleOver()) {
+                                engine.stop();
+                                engineStopped = true; // Update flag after stopping
+                            }
+                        } else if (teamsWithAliveRobots == 0) {
+                            // All teams eliminated - but only declare draw if engine is stopped
+                            // This prevents false draw during active combat when robots might be temporarily below MOTION_ENERGY
+                            if (engineStopped) {
+                                battleOver = true;
+                            } else {
+                                // Engine still running - might be temporary, don't declare draw yet
+                                battleOver = false;
+                            }
+                        } else {
+                            // Multiple teams still alive - battle continues
+                            battleOver = false;
+                        }
+                    } else if (engine != null) {
+                        battleOver = engineStopped && engine.isBattleOver();
+                        activeCount = engine.getActiveRobotCount();
                     }
                     
-                    // Update dashboard
-                    dashboard.update(views);
-                    
-                    // Repaint
-                    panel.repaint();
+                    // CRITICAL: Announce winner ONLY when battle is truly over (engine stopped) and winner not yet declared
+                    // Do NOT announce during active combat - wait for engine to stop
+                    if (battleOver && engineStopped && (engine == null || !engine.isWinnerDeclared())) {
+                        System.out.println("[UI] ========================================");
+                        System.out.println("[UI] BATTLE OVER DETECTED - Determining winner...");
+                        System.out.println("[UI] Active robots remaining: " + activeCount);
+                        
+                        String winnerTeam = determineWinnerTeam(views);
+                        System.out.println("[UI] Winner team determined: " + (winnerTeam != null ? winnerTeam : "NONE"));
+                        System.out.println("[UI] ========================================");
+
+                        // CRITICAL: Only declare winner AFTER battle is completely over (engine stopped)
+                        // The engine should already be stopped at this point
+                        if (engine != null) {
+                            engine.setWinnerDeclared(true);
+                            if (!engine.isBattleOver()) {
+                                engine.stop(); // Ensure engine is stopped
+                                System.out.println("[UI] Engine stopped");
+                            }
+                        }
+
+                        if (winnerTeam != null && !winnerTeam.isEmpty()) {
+                            System.out.println("[UI] *** WINNER ANNOUNCED: " + winnerTeam + " ***");
+                            
+                            // Announce in kill feed
+                            if (controlsPanel != null) {
+                                controlsPanel.addKillFeed("");
+                                controlsPanel.addKillFeed(">>> " + winnerTeam + " WINS! <<<");
+                                controlsPanel.addKillFeed("");
+                            }
+                            
+                            // Show winner popup
+                            showWinnerPopup(winnerTeam, views);
+                        } else {
+                            System.out.println("[UI] *** DRAW - NO WINNER ***");
+                            
+                            // Announce in kill feed
+                            if (controlsPanel != null) {
+                                controlsPanel.addKillFeed("");
+                                controlsPanel.addKillFeed(">>> DRAW - NO WINNER <<<");
+                                controlsPanel.addKillFeed("");
+                            }
+                            
+                            // Show draw popup
+                            showDrawPopup(views);
+                        }
+                        
+                        // Stop the UI timer to freeze the display
+                        javax.swing.Timer uiTimer = getTimer();
+                        if (uiTimer != null && uiTimer.isRunning()) {
+                            uiTimer.stop();
+                            System.out.println("[UI] Timer stopped - game frozen");
+                        }
+                        
+                        // Final repaint
+                        panel.repaint();
+                    } else {
+                        // Normal repaint during battle
+                        panel.repaint();
+                    }
                 });
                 setTimer(timer);
                 timer.start();
             }
+        }
+        
+        /**
+         * Determine the winning team from the views.
+         * 
+         * @param views the list of robot views
+         * @return the winning team name, or null if draw
+         */
+        private String determineWinnerTeam(List<DroidView<? extends Droid>> views) {
+            java.util.Map<String, Integer> teamAliveCount = new java.util.HashMap<>();
+
+            System.out.println("[UI] Determining winner from " + views.size() + " views...");
+
+            // Count only robots that can actually move (energy >= MOTION_ENERGY)
+            // CRITICAL: Also check if robot is still on battlefield (not removed)
+            for (DroidView<? extends Droid> view : views) {
+                if (view == null) continue;
+                Droid robot = view.getRobot();
+                if (robot == null) continue;
+
+                int energy = (int) robot.getEnergy();
+                String viewName = view.getName();
+                int motionEnergy = fr.ensibs.robots.logic.BattleSetup.MOTION_ENERGY;
+                
+                System.out.println("[UI]   Checking robot: " + viewName + " (Energy: " + energy + ", MOTION_ENERGY: " + motionEnergy + ")");
+
+                if (energy >= motionEnergy) {
+                    String teamName = extractTeamName(viewName);
+                    System.out.println("[UI]     -> ACTIVE robot from team: " + teamName + " (energy: " + energy + ")");
+                    teamAliveCount.put(teamName, teamAliveCount.getOrDefault(teamName, 0) + 1);
+                } else {
+                    System.out.println("[UI]     -> INACTIVE robot: " + viewName + " (energy: " + energy + " < " + motionEnergy + ")");
+                }
+            }
+
+            System.out.println("[UI] Team counts: " + teamAliveCount);
+
+            // Find team with alive robots
+            if (teamAliveCount.size() == 1) {
+                String winner = teamAliveCount.keySet().iterator().next();
+                System.out.println("[UI] Winner found: " + winner + " (only team with alive robots)");
+                return winner;
+            } else if (teamAliveCount.size() == 0) {
+                System.out.println("[UI] No teams with active robots - checking by total energy");
+                // If no robots can move, find the team with the highest total energy
+                java.util.Map<String, Integer> teamEnergyTotal = new java.util.HashMap<>();
+                for (DroidView<? extends Droid> view : views) {
+                    if (view == null || view.getRobot() == null) continue;
+                    String teamName = extractTeamName(view.getName());
+                    int energy = (int) view.getRobot().getEnergy();
+                    if (energy > 0) { // Only count robots with energy > 0
+                        teamEnergyTotal.put(teamName, teamEnergyTotal.getOrDefault(teamName, 0) + energy);
+                    }
+                }
+                
+                if (teamEnergyTotal.isEmpty()) {
+                    System.out.println("[UI] No teams with any energy - true draw");
+                    return null; // True draw - all robots dead
+                }
+                
+                // Find team with highest energy
+                String winner = null;
+                int maxEnergy = -1;
+                for (java.util.Map.Entry<String, Integer> entry : teamEnergyTotal.entrySet()) {
+                    if (entry.getValue() > maxEnergy) {
+                        maxEnergy = entry.getValue();
+                        winner = entry.getKey();
+                    }
+                }
+                System.out.println("[UI] Winner by energy: " + winner + " (Total: " + maxEnergy + ")");
+                return winner;
+            }
+
+            // Multiple teams still alive - check if we can determine a winner anyway
+            // (This shouldn't happen if battleOver is set correctly, but just in case)
+            System.out.println("[UI] Multiple teams still alive: " + teamAliveCount.keySet());
+            
+            // If we have exactly 2 teams and one has significantly more robots, that team wins
+            // But this is a fallback - the main logic should catch this earlier
+            if (teamAliveCount.size() == 2) {
+                java.util.Iterator<java.util.Map.Entry<String, Integer>> it = teamAliveCount.entrySet().iterator();
+                java.util.Map.Entry<String, Integer> team1 = it.next();
+                java.util.Map.Entry<String, Integer> team2 = it.next();
+                
+                // If one team has all the robots and the other has 0, that team wins
+                if (team1.getValue() > 0 && team2.getValue() == 0) {
+                    System.out.println("[UI] Fallback: Team " + team1.getKey() + " wins (other team has 0 robots)");
+                    return team1.getKey();
+                } else if (team2.getValue() > 0 && team1.getValue() == 0) {
+                    System.out.println("[UI] Fallback: Team " + team2.getKey() + " wins (other team has 0 robots)");
+                    return team2.getKey();
+                }
+            }
+            
+            return null; // No clear winner or multiple teams still alive
+        }
+        
+        /**
+         * Show winner popup dialog when battle ends.
+         * 
+         * @param winnerTeam the winning team name
+         * @param views the list of robot views for stats
+         */
+        private void showWinnerPopup(String winnerTeam, List<DroidView<? extends Droid>> views) {
+            SwingUtilities.invokeLater(() -> {
+                // Calculate stats
+                int totalKills = 0;
+                int survivors = 0;
+                if (battlefield instanceof BattlefieldImpl) {
+                    BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+                    for (DroidView<? extends Droid> view : views) {
+                        if (view != null && view.getRobot() != null) {
+                            Droid robot = view.getRobot();
+                            String teamName = extractTeamName(view.getName());
+                            if (teamName.equals(winnerTeam) && robot.getEnergy() > 0) {
+                                survivors++;
+                            }
+                            // Get kills for this robot
+                            int kills = impl.getKills(robot);
+                            if (teamName.equals(winnerTeam)) {
+                                totalKills += kills;
+                            }
+                        }
+                    }
+                }
+                
+                String message = String.format(
+                    "------------------------\n" +
+                    "    VICTORY\n" +
+                    "    \n" +
+                    "Team %s Wins!\n" +
+                    "\n" +
+                    "Total Kills: %d\n" +
+                    "Survivors: %d robots\n" +
+                    "------------------------",
+                    winnerTeam, totalKills, survivors
+                );
+                
+                JOptionPane.showMessageDialog(
+                    EnhancedBattlefieldFrame.this,
+                    message,
+                    "Battle Ended - Victory!",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+            });
+        }
+        
+        /**
+         * Show draw popup dialog when battle ends in a draw.
+         * 
+         * @param views the list of robot views
+         */
+        private void showDrawPopup(List<DroidView<? extends Droid>> views) {
+            SwingUtilities.invokeLater(() -> {
+                String message = 
+                    "------------------------\n" +
+                    "    DRAW\n" +
+                    "    \n" +
+                    "No team survived!\n" +
+                    "------------------------";
+                
+                JOptionPane.showMessageDialog(
+                    EnhancedBattlefieldFrame.this,
+                    message,
+                    "Battle Ended - Draw!",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+            });
+        }
+        
+        /**
+         * Check if a team has been eliminated (all robots dead) and announce it.
+         * 
+         * @param views the list of all robot views
+         * @param deadRobot the robot that just died
+         */
+        private void checkTeamElimination(List<DroidView<? extends Droid>> views, Droid deadRobot) {
+            if (deadRobot == null || controlsPanel == null) {
+                return;
+            }
+            
+            // Find the team of the dead robot
+            String deadRobotTeam = null;
+            for (DroidView<? extends Droid> view : views) {
+                if (view != null && view.getRobot() == deadRobot) {
+                    deadRobotTeam = extractTeamName(view.getName());
+                    break;
+                }
+            }
+            
+            if (deadRobotTeam == null) {
+                return; // Couldn't find team
+            }
+            
+            // Count alive robots for this team
+            int aliveCount = 0;
+            for (DroidView<? extends Droid> view : views) {
+                if (view != null && view.getRobot() != null) {
+                    String teamName = extractTeamName(view.getName());
+                    if (teamName.equals(deadRobotTeam)) {
+                        Droid robot = view.getRobot();
+                        int energy = (int) robot.getEnergy();
+                        int motionEnergy = fr.ensibs.robots.logic.BattleSetup.MOTION_ENERGY;
+                        if (energy >= motionEnergy) {
+                            aliveCount++;
+                        }
+                    }
+                }
+            }
+            
+            // If no alive robots left, team is eliminated
+            if (aliveCount == 0) {
+                System.out.println("[TEAM ELIMINATION] Team " + deadRobotTeam + " has been eliminated!");
+                if (controlsPanel != null) {
+                    controlsPanel.addKillFeed("");
+                    controlsPanel.addKillFeed(">>> TEAM " + deadRobotTeam + " ELIMINATED <<<");
+                    controlsPanel.addKillFeed("");
+                }
+            }
+        }
+        
+        /**
+         * Extract team name from robot view name.
+         * 
+         * @param viewName the view name (e.g., "AbdelkrimS Leader" or "AbdelkrimS Droid 1")
+         * @return the team name (e.g., "AbdelkrimS")
+         */
+        private String extractTeamName(String viewName) {
+            if (viewName == null) return "Unknown";
+            
+            // Handle truncated names (e.g., ".hakimS Leader" -> "AbdelhakimS")
+            // Try to match common patterns
+            if (viewName.startsWith(".")) {
+                // Try to reconstruct full name from truncated version
+                if (viewName.contains("hakim")) return "AbdelhakimS";
+                if (viewName.contains("razak")) return "AbdelrazakS";
+                if (viewName.contains("krim")) return "AbdelkrimS";
+                if (viewName.contains("ssim")) return "NassimS";
+            }
+            
+            // Normal extraction: "AbdelkrimS Leader" -> "AbdelkrimS"
+            if (viewName.contains(" ")) {
+                return viewName.substring(0, viewName.indexOf(" "));
+            }
+            return viewName;
+        }
+        
+        /**
+         * Find robot name from views list given a robot instance.
+         * 
+         * @param views the list of robot views
+         * @param robot the robot to find
+         * @return the robot name or null if not found
+         */
+        private String findRobotName(List<DroidView<? extends Droid>> views, BaseDroid robot) {
+            if (robot == null || views == null) return null;
+            for (DroidView<? extends Droid> view : views) {
+                if (view != null && view.getRobot() == robot) {
+                    return view.getName();
+                }
+            }
+            // Fallback: use class name
+            return robot.getClass().getSimpleName();
         }
         
         // Accessor methods using reflection since timer is private
@@ -577,7 +1172,7 @@ public class EnhancedBattlefieldFrame extends JFrame
     /**
      * Get the dashboard for external access.
      * 
-     * @return the dashboard
+     * @return the dashboard (may be null if removed)
      */
     public BattleDashboard getDashboard()
     {

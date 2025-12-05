@@ -244,28 +244,36 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
     }
     
     /**
-     * Auto-load default teams from teams/ directory.
+     * Auto-load default teams from libs/ directory.
      */
     private void autoLoadDefaultTeams()
     {
-        File teamsDir = new File("teams");
-        if (!teamsDir.exists()) {
-            teamsDir = new File("../teams"); // Try parent directory
+        File libsDir = new File("libs");
+        if (!libsDir.exists()) {
+            libsDir = new File("../libs");
+        }
+        if (!libsDir.exists()) {
+            libsDir = new File("../../libs");
         }
         
-        if (teamsDir.exists() && teamsDir.isDirectory()) {
-            File[] jarFiles = teamsDir.listFiles((dir, name) -> name.endsWith(".jar"));
+        if (libsDir.exists() && libsDir.isDirectory()) {
+            File[] jarFiles = libsDir.listFiles((dir, name) -> name.endsWith(".jar"));
             if (jarFiles != null) {
+                System.out.println("[TEAM LOADER] Found " + jarFiles.length + " JAR files in " + libsDir.getAbsolutePath());
                 for (File jarFile : jarFiles) {
                     try {
                         TeamInfo team = robotLoader.loadTeamFromJar(jarFile);
                         availableTeams.add(team);
                         availableTeamsModel.addElement(team.getName());
+                        System.out.println("[TEAM LOADER] Loaded team: " + team.getName());
                     } catch (Exception e) {
                         System.err.println("Failed to load team from " + jarFile + ": " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }
+        } else {
+            System.err.println("[TEAM LOADER] libs directory not found. Tried: libs, ../libs, ../../libs");
         }
     }
     
@@ -308,13 +316,16 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             }
         });
         
-        // Default to teams/ directory
-        File teamsDir = new File("teams");
-        if (!teamsDir.exists()) {
-            teamsDir = new File("../teams");
+        // Default to libs/ directory
+        File libsDir = new File("libs");
+        if (!libsDir.exists()) {
+            libsDir = new File("../libs");
         }
-        if (teamsDir.exists()) {
-            fileChooser.setCurrentDirectory(teamsDir);
+        if (!libsDir.exists()) {
+            libsDir = new File("../../libs");
+        }
+        if (libsDir.exists()) {
+            fileChooser.setCurrentDirectory(libsDir);
         }
         
         int result = fileChooser.showOpenDialog(this);

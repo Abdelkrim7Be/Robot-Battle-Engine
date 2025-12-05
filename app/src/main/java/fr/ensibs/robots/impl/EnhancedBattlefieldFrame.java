@@ -805,9 +805,14 @@ public class EnhancedBattlefieldFrame extends JFrame
                         activeCount = engine.getActiveRobotCount();
                     }
                     
-                    // CRITICAL: Announce winner ONLY when battle is truly over (engine stopped) and winner not yet declared
-                    // Do NOT announce during active combat - wait for engine to stop
-                    if (battleOver && engineStopped && (engine == null || !engine.isWinnerDeclared())) {
+                    // Check if engine stopped unexpectedly (no winner declared yet)
+                    boolean engineStoppedUnexpectedly = engineStopped && (engine == null || !engine.isWinnerDeclared());
+                    
+                    // Also check if battle should be over (all teams exhausted or only one team left)
+                    boolean shouldBeOver = battleOver || (activeCount <= 1 && engineStopped);
+                    
+                    // CRITICAL: Announce winner when battle is over OR engine stopped unexpectedly
+                    if ((shouldBeOver || engineStoppedUnexpectedly) && (engine == null || !engine.isWinnerDeclared())) {
                         System.out.println("[UI] ========================================");
                         System.out.println("[UI] BATTLE OVER DETECTED - Determining winner...");
                         System.out.println("[UI] Active robots remaining: " + activeCount);
@@ -914,67 +919,118 @@ public class EnhancedBattlefieldFrame extends JFrame
                 System.out.println("[UI] Winner found: " + winner + " (only team with alive robots)");
                 return winner;
             } else if (teamAliveCount.size() == 0) {
-                System.out.println("[UI] No teams with active robots - checking by total energy");
-                // If no robots can move, find the team with the highest total energy
+                System.out.println("[UI] No teams with active robots - checking by kills and energy");
+                
+                java.util.Map<String, Integer> teamKills = new java.util.HashMap<>();
                 java.util.Map<String, Integer> teamEnergyTotal = new java.util.HashMap<>();
-                for (DroidView<? extends Droid> view : views) {
-                    if (view == null || view.getRobot() == null) continue;
-                    String teamName = extractTeamName(view.getName());
-                    int energy = (int) view.getRobot().getEnergy();
-                    // Count all robots with energy >= 0 (including those with 0 energy)
-                    // This ensures we can determine a winner even if all are exhausted
-                    if (energy >= 0) {
-                        teamEnergyTotal.put(teamName, teamEnergyTotal.getOrDefault(teamName, 0) + energy);
+                
+                if (battlefield instanceof BattlefieldImpl) {
+                    BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+                    DamageTracker tracker = impl.getDamageTracker();
+                    
+                    for (DroidView<? extends Droid> view : views) {
+                        if (view == null || view.getRobot() == null) continue;
+                        String teamName = extractTeamName(view.getName());
+                        Droid robot = view.getRobot();
+                        int energy = (int) robot.getEnergy();
+                        
+                        int kills = impl.getKills(robot);
+                        if (kills == 0) {
+                            kills = tracker.getKills(robot);
+                        }
+                        
+                        if (energy >= 0) {
+                            teamEnergyTotal.put(teamName, teamEnergyTotal.getOrDefault(teamName, 0) + energy);
+                            teamKills.put(teamName, teamKills.getOrDefault(teamName, 0) + kills);
+                        }
                     }
                 }
                 
                 if (teamEnergyTotal.isEmpty()) {
                     System.out.println("[UI] No teams found at all - true draw");
-                    return null; // True draw - no robots found
+                    return null;
                 }
                 
-                // Find team with highest energy (even if all are 0, we'll still have a result)
+                // Winner by: 1) Most kills, 2) Most energy
                 String winner = null;
+                int maxKills = -1;
                 int maxEnergy = Integer.MIN_VALUE;
-                for (java.util.Map.Entry<String, Integer> entry : teamEnergyTotal.entrySet()) {
-                    if (entry.getValue() > maxEnergy) {
-                        maxEnergy = entry.getValue();
-                        winner = entry.getKey();
+                
+                for (java.util.Map.Entry<String, Integer> entry : teamKills.entrySet()) {
+                    String team = entry.getKey();
+                    int kills = entry.getValue();
+                    int energy = teamEnergyTotal.getOrDefault(team, 0);
+                    
+                    if (kills > maxKills || (kills == maxKills && energy > maxEnergy)) {
+                        maxKills = kills;
+                        maxEnergy = energy;
+                        winner = team;
                     }
                 }
                 
-                // If all teams have 0 energy, it's a draw
-                if (maxEnergy <= 0) {
-                    System.out.println("[UI] All teams have zero or negative energy - true draw");
-                    return null; // True draw - all robots dead/exhausted
+                if (winner != null && (maxKills > 0 || maxEnergy > 0)) {
+                    System.out.println("[UI] Winner by score: " + winner + " (Kills: " + maxKills + ", Energy: " + maxEnergy + ")");
+                    return winner;
                 }
                 
-                System.out.println("[UI] Winner by energy: " + winner + " (Total: " + maxEnergy + ")");
-                return winner;
+                System.out.println("[UI] All teams eliminated - true draw");
+                return null;
             }
 
-            // Multiple teams still alive - check if we can determine a winner anyway
-            // (This shouldn't happen if battleOver is set correctly, but just in case)
-            System.out.println("[UI] Multiple teams still alive: " + teamAliveCount.keySet());
+            // Multiple teams still alive - use kills/scores as tiebreaker
+            System.out.println("[UI] Multiple teams still alive: " + teamAliveCount.keySet() + " - checking kills/scores");
             
-            // If we have exactly 2 teams and one has significantly more robots, that team wins
-            // But this is a fallback - the main logic should catch this earlier
-            if (teamAliveCount.size() == 2) {
-                java.util.Iterator<java.util.Map.Entry<String, Integer>> it = teamAliveCount.entrySet().iterator();
-                java.util.Map.Entry<String, Integer> team1 = it.next();
-                java.util.Map.Entry<String, Integer> team2 = it.next();
+            // Get kills for each team
+            java.util.Map<String, Integer> teamKills = new java.util.HashMap<>();
+            java.util.Map<String, Integer> teamEnergy = new java.util.HashMap<>();
+            
+            if (battlefield instanceof BattlefieldImpl) {
+                BattlefieldImpl impl = (BattlefieldImpl) battlefield;
+                DamageTracker tracker = impl.getDamageTracker();
                 
-                // If one team has all the robots and the other has 0, that team wins
-                if (team1.getValue() > 0 && team2.getValue() == 0) {
-                    System.out.println("[UI] Fallback: Team " + team1.getKey() + " wins (other team has 0 robots)");
-                    return team1.getKey();
-                } else if (team2.getValue() > 0 && team1.getValue() == 0) {
-                    System.out.println("[UI] Fallback: Team " + team2.getKey() + " wins (other team has 0 robots)");
-                    return team2.getKey();
+                for (DroidView<? extends Droid> view : views) {
+                    if (view == null || view.getRobot() == null) continue;
+                    String teamName = extractTeamName(view.getName());
+                    Droid robot = view.getRobot();
+                    
+                    int kills = impl.getKills(robot);
+                    if (kills == 0) {
+                        kills = tracker.getKills(robot);
+                    }
+                    
+                    teamKills.put(teamName, teamKills.getOrDefault(teamName, 0) + kills);
+                    teamEnergy.put(teamName, teamEnergy.getOrDefault(teamName, 0) + (int)robot.getEnergy());
                 }
             }
             
-            return null; // No clear winner or multiple teams still alive
+            // Determine winner by: 1) Most alive robots, 2) Most kills, 3) Most energy
+            String winner = null;
+            int maxAlive = -1;
+            int maxKills = -1;
+            int maxEnergy = -1;
+            
+            for (java.util.Map.Entry<String, Integer> entry : teamAliveCount.entrySet()) {
+                String team = entry.getKey();
+                int alive = entry.getValue();
+                int kills = teamKills.getOrDefault(team, 0);
+                int energy = teamEnergy.getOrDefault(team, 0);
+                
+                if (alive > maxAlive || 
+                    (alive == maxAlive && kills > maxKills) ||
+                    (alive == maxAlive && kills == maxKills && energy > maxEnergy)) {
+                    maxAlive = alive;
+                    maxKills = kills;
+                    maxEnergy = energy;
+                    winner = team;
+                }
+            }
+            
+            if (winner != null) {
+                System.out.println("[UI] Winner by score: " + winner + " (Alive: " + maxAlive + ", Kills: " + maxKills + ", Energy: " + maxEnergy + ")");
+                return winner;
+            }
+            
+            return null;
         }
         
         /**
@@ -1189,4 +1245,5 @@ public class EnhancedBattlefieldFrame extends JFrame
         return dashboard;
     }
 }
+
 

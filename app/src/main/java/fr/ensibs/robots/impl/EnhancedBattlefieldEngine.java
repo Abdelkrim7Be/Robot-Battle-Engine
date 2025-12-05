@@ -51,6 +51,9 @@ public class EnhancedBattlefieldEngine
     private int tickCount = 0;
     private int lastDebugOutput = 0;
     
+    // Battle timing
+    private long battleStartTime = 0;
+    
     /**
      * Constructor
      * 
@@ -106,6 +109,7 @@ public class EnhancedBattlefieldEngine
     public void start()
     {
         if (this.scheduledFuture == null) {
+            battleStartTime = System.currentTimeMillis();
             System.out.println("[ENGINE] Starting EnhancedBattlefieldEngine with period " + period + "ms (~" + (1000/period) + " ticks/sec)");
             scheduledFuture = scheduler.scheduleAtFixedRate(this::runGameLoop, 0, period, MILLISECONDS);
             System.out.println("[ENGINE] Engine started! Game loop will run every " + period + "ms");
@@ -288,19 +292,23 @@ public class EnhancedBattlefieldEngine
         // Step 9: MISSION A.4 - Apply passive regeneration after all robot actions
         battlefieldImpl.processPassiveRegeneration();
         
-        // Step 10: Check for win condition - only one team remaining
+        // Step 10: Check for win condition - check teams that can actually move
         // Recalculate count AFTER all updates to ensure accuracy
         int finalActiveCount = battlefieldImpl.getActiveRobotCount();
-        // Stop if there are 0 active robots (all dead) or exactly 1 robot left (last team wins)
-        // The UI will determine the winner based on teams
-        if (finalActiveCount <= 1) {
-            // Battle is over - stop the engine
-            // If 0 robots: all dead (draw)
-            // If 1 robot: only one team remains (that team wins)
+        
+        // Also check if we've been running too long (timeout after 5 minutes)
+        long battleDuration = System.currentTimeMillis() - battleStartTime;
+        boolean timeout = battleDuration > 300000; // 5 minutes
+        
+        // Stop if: 0-1 active robots, OR timeout reached
+        // The UI will determine the winner based on teams and scores
+        if (finalActiveCount <= 1 || timeout) {
             stop();
             System.out.println("\n=== BATTLE OVER ===");
             System.out.println("Active robots remaining: " + finalActiveCount);
-            if (finalActiveCount == 0) {
+            if (timeout) {
+                System.out.println("Battle timeout reached (" + (battleDuration / 1000) + "s)! Determining winner by score...");
+            } else if (finalActiveCount == 0) {
                 System.out.println("All robots eliminated! Stopping engine...");
             } else {
                 System.out.println("Only one robot remaining! Stopping engine...");

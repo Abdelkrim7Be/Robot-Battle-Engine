@@ -93,8 +93,23 @@ tasks.register<Jar>("buildNassimTeam") {
     }
 }
 
+// Task to build BHHH team JAR
+tasks.register<Jar>("buildBHHHTeam") {
+    dependsOn("createTeamsDir", "classes")
+    archiveBaseName.set("BHHH")
+    destinationDirectory.set(teamsDir)
+    
+    from(sourceSets.main.get().output) {
+        include("fr/ensibs/tasks/teams/bhhh/**")
+    }
+    
+    manifest {
+        attributes(mapOf("Main-Class" to "fr.ensibs.tasks.teams.bhhh.BHHHLeader"))
+    }
+}
+
 // Task to build all teams
 tasks.register("buildAllTeams") {
-    dependsOn("buildAbdelkrimTeam", "buildAbdelhakimTeam", "buildAbdelrazakTeam", "buildNassimTeam")
+    dependsOn("buildAbdelkrimTeam", "buildAbdelhakimTeam", "buildAbdelrazakTeam", "buildNassimTeam", "buildBHHHTeam")
     description = "Build all team JAR files"
 }

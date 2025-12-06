@@ -16,7 +16,33 @@ This project is composed of 4 folders:
 - Java 17 or higher
 - Gradle 8 or higher
 
-## Build
+**OR**
+
+- Docker (for the easiest setup - no Java/Gradle installation needed!)
+
+## Quick Start
+
+### 🐳 Docker Run (Easiest - Recommended!)
+
+**Just run this from the robots/ folder:**
+
+```bash
+./run-docker.sh
+```
+
+That's it! The script will:
+- ✅ Check if Docker is installed and running
+- ✅ Set up X11 forwarding for GUI
+- ✅ Build the Docker image (first time only)
+- ✅ Run the application with all dependencies included
+
+**What you need:**
+- Docker installed
+- That's it! No Java or Gradle needed.
+
+**Note:** Make sure you're running from a graphical session (X11).
+
+### Standard Run (Requires Java 17+ and Gradle)
 
 To build the project:
 
@@ -24,13 +50,31 @@ To build the project:
 gradle build
 ```
 
-## Run
-
-To run the application:
+To run the application locally:
 
 ```bash
 gradle :app:run
 ```
+
+## Docker Details
+
+The Docker setup includes:
+- Java 17 (Eclipse Temurin)
+- Gradle 8.5
+- All project dependencies
+- X11 libraries for GUI display
+- Automatic class version patching (supports JARs compiled with Java 21)
+
+**Files:**
+- `Dockerfile` - Builds the Docker image
+- `run-docker.sh` - Simple script to run the app
+- `docker-compose.yml` - Alternative way to run (optional)
+- `.dockerignore` - Excludes unnecessary files from build
+
+**Troubleshooting:**
+- If GUI doesn't appear: Make sure X11 forwarding is set up (`xhost +local:docker` on Linux)
+- If teams don't load: Check that `libs/` directory contains team JAR files
+- First run is slow: Docker needs to download base image and build everything (subsequent runs are fast)
 
 ## Usage
 

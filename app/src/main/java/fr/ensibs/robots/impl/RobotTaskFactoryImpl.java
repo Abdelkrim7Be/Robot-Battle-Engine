@@ -256,9 +256,11 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
         {
             byte[] copy = original.clone();
             int major = ((copy[6] & 0xFF) << 8) | (copy[7] & 0xFF);
-            if (major > 65) {
+            // Java 17 supports up to class file version 61.0
+            // Patch any newer versions (Java 18+ = 62+, Java 21 = 65) down to 61 (Java 17)
+            if (major > 61) {
                 copy[6] = 0;
-                copy[7] = 65;
+                copy[7] = 61;  // Java 17 class file version
             }
             return copy;
         }

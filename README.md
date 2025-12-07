@@ -1,6 +1,17 @@
 # Robot Wars Battle Engine
 
-Robot battle simulator for ENSIBS 4th year Advanced OOP course. Teams of robots fight on a battlefield following specific rules for energy, damage, and targeting.
+Simulateur de batailles de robots pour le cours de POO avancée (4e année ENSIBS).
+Des équipes de robots s’affrontent sur un champ de bataille avec gestion d’énergie, dégâts et ciblage.
+Exécutable via Docker (recommandé) ou Java/Gradle, avec interface graphique.
+Projet modulaire : API, application, tâches (IA des équipes) et librairies partagées.
+
+## Démonstration
+
+Vous pouvez visionner une courte démonstration du jeu ci-dessous :
+
+<video src="./demo-jeu-java.mp4" controls width="720">
+Votre navigateur ne supporte pas la balise vidéo. Téléchargez la vidéo ici : [demo-jeu-java.mp4](./demo-jeu-java.mp4).
+</video>
 
 ## Structure
 

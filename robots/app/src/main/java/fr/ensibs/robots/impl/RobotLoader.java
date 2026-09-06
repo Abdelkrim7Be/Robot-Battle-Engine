@@ -92,11 +92,10 @@ public class RobotLoader
         try {
             java.lang.reflect.Field colorField = leaderClass.getField("TEAM_COLOR");
             teamColor = (java.awt.Color) colorField.get(null);
-            System.out.println("  Loaded TEAM_COLOR from JAR: " + teamColor + " (RGB: " + 
-                              teamColor.getRed() + "," + teamColor.getGreen() + "," + teamColor.getBlue() + ")");
+            AppLog.debug("Loaded TEAM_COLOR from JAR: " + teamColor + " (RGB: "
+                + teamColor.getRed() + "," + teamColor.getGreen() + "," + teamColor.getBlue() + ")");
         } catch (Exception e) {
-            // No TEAM_COLOR constant - use default
-            System.out.println("  No TEAM_COLOR in JAR, using default CYAN");
+            AppLog.debug("No TEAM_COLOR in JAR, using default CYAN");
         }
         
         // Try to extract team name from leader class if it has TEAM_NAME constant
@@ -143,4 +142,3 @@ public class RobotLoader
         return names;
     }
 }
-

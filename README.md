@@ -1,22 +1,17 @@
+[Image #1]
+
 <div align="center">
 
 # Robot Wars Battle Engine
 
-Self-hosted Java battle simulator for programmable robot teams, modular APIs, real-time Swing rendering, team JAR loading, and Docker-based execution.
+Programmable Java robot battle simulator with a modular API, Swing rendering, dynamic team JAR loading, and Docker-based execution.
 
-[![CI](https://img.shields.io/badge/CI-compile%20verified-brightgreen?style=flat-square)](#verification)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
-
-![Java](https://img.shields.io/badge/Java-17+-007396?style=for-the-badge&logo=openjdk&logoColor=white)
-![Gradle](https://img.shields.io/badge/Gradle-Wrapper-02303A?style=for-the-badge&logo=gradle&logoColor=white)
-![Swing](https://img.shields.io/badge/UI-Java%20Swing-5382A1?style=for-the-badge)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Java](https://img.shields.io/badge/Java-17+-007396?style=flat-square&logo=openjdk&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-Wrapper-02303A?style=flat-square&logo=gradle&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 </div>
-
-## Overview
-
-Robot Wars Battle Engine is a modular Java application where robot teams are loaded from JAR files and compete on a real-time battlefield. Each team provides a leader and droid behavior through the public API. The application handles spawning, movement, scanning, firing, damage, energy management, kill tracking, and visual feedback through a Swing-based terminal-style interface.
 
 ## Screenshots
 
@@ -24,17 +19,22 @@ Robot Wars Battle Engine is a modular Java application where robot teams are loa
 
 ![Robot Wars battle screen](docs/screenshots/robot-wars-battle.png)
 
-A recorded demo is also available in [robots/demo-jeu-java.mp4](robots/demo-jeu-java.mp4).
+A recorded demo is available at [robots/demo-jeu-java.mp4](robots/demo-jeu-java.mp4).
+
+## Overview
+
+Robot Wars Battle Engine lets multiple robot teams compete on a real-time battlefield. Teams are distributed as JAR files, loaded at runtime, and controlled through the public robot API. The engine handles movement, radar scanning, firing, bullet collisions, energy, gun heat, kills, wreckage, HUD overlays, and match lifecycle.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Teams[Team JARs] --> Loader[RobotLoader]
-    Loader --> Factory[RobotTaskFactory]
+    TeamJars[Team JARs] --> Loader[RobotLoader]
+    Loader --> Factory[RobotTaskFactoryImpl]
     API[api module] --> App[app module]
-    Factory --> Engine[EnhancedBattlefieldEngine]
-    App --> Engine
+    Factory --> Tasks[Team Leader and Droid Tasks]
+    App --> Engine[EnhancedBattlefieldEngine]
+    Tasks --> Engine
     Engine --> Battlefield[BattlefieldImpl]
     Battlefield --> Renderer[NeonBattlefieldPanel]
     Renderer --> UI[Swing UI]
@@ -42,18 +42,20 @@ flowchart LR
 
 | Path | Responsibility |
 | --- | --- |
-| `api/` | Public robot, battlefield, view, and factory contracts. |
-| `robots/app/` | Runnable Swing application, engine loop, rendering, loaders, and tests. |
-| `robots/tasks/` | Built-in robot team implementations and sample strategies. |
-| `libs/` | Runtime team JARs loaded by the application. |
-| `robots/Dockerfile` | Containerized runtime for environments without local Java setup. |
+| `api/` | Public contracts for robots, droids, teams, battlefield logic, factories, and views. |
+| `robots/app/` | Runnable Swing application, engine loop, rendering, team loading, match orchestration, and tests. |
+| `robots/tasks/` | Source code for bundled robot team strategies and sample tasks. |
+| `libs/` | Runtime team JARs loaded automatically by the application. |
+| `docs/screenshots/` | README screenshots captured from a real app launch. |
+| `robots/Dockerfile` | Container image for running the GUI application with X11 forwarding. |
 
 ## Requirements
 
 - Java 17 or newer
-- Docker with X11 forwarding for containerized GUI execution
+- Docker and Docker Compose for containerized execution
+- X11 display access when running the GUI from Docker
 
-The Gradle wrapper is committed, so no system Gradle installation is required.
+Gradle is provided through the wrapper; a system Gradle installation is not required.
 
 ## Run Locally
 
@@ -62,47 +64,71 @@ cd robots
 ./gradlew :app:run
 ```
 
-## Run With Docker
+## Build And Test
 
 ```bash
 cd robots
-./run-docker.sh
+./gradlew :app:test :tasks:buildAllTeams
 ```
 
-The Docker runner builds from the repository root so the container can access `api/`, `libs/`, and `robots/`. On Linux, make sure an X11 session is available. On macOS or Windows, run an X server such as XQuartz, VcXsrv, or Xming and adjust `DISPLAY` if needed.
-
-## Build
+Build only the application distribution:
 
 ```bash
 cd robots
 ./gradlew :app:build
 ```
 
-Build all packaged team JARs:
+Build all bundled team JARs into `libs/`:
 
 ```bash
 cd robots
 ./gradlew :tasks:buildAllTeams
 ```
 
-## Gameplay
+## Docker
 
-1. Launch the application.
-2. Select at least two available teams.
-3. Assign colors and add teams to the battle list.
-4. Start the battle.
-5. The engine runs until one team remains or the timeout/draw condition is reached.
-
-## Verification
-
-The application was compiled with:
+The project is Dockerized for environments where Java is not installed locally.
 
 ```bash
 cd robots
-./gradlew :app:compileJava
+./run-docker.sh
 ```
 
-Screenshots were captured from a real Swing launch under Xvfb.
+Or with Compose:
+
+```bash
+docker compose -f robots/docker-compose.yml build
+docker compose -f robots/docker-compose.yml up
+```
+
+On Linux, allow X11 access before launching the container if your desktop session requires it:
+
+```bash
+xhost +local:docker
+```
+
+On macOS or Windows, run an X server such as XQuartz, VcXsrv, or Xming and adjust `DISPLAY` as needed.
+
+## Gameplay
+
+1. Launch the application.
+2. Select at least two teams from the available team list.
+3. Choose team colors and add them to the battle list.
+4. Start the battle.
+5. Watch the match until one team wins or the battle reaches its draw condition.
+
+## Verification
+
+Current verification:
+
+```bash
+cd robots
+./gradlew :app:test :tasks:buildAllTeams
+cd ..
+docker compose -f robots/docker-compose.yml build
+```
+
+Screenshots in `docs/screenshots/` were captured from the running Swing application under Xvfb.
 
 ## License
 

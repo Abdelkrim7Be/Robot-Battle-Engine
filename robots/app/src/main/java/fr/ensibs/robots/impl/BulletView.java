@@ -58,20 +58,13 @@ public class BulletView
             double nx = speed > 0.001 ? velocityX / speed : 0;
             double ny = speed > 0.001 ? velocityY / speed : 0;
             
-            // CRITICAL FIX: Limit trail length to prevent accumulation
-            // Trail length based on speed, but capped to prevent long trails
             double trailLength = Math.min(30, speed * 1.5); // Max 30 pixels
             
-            // MISSION F: Determine color by team (default to cyan for team 0, orange for team 1)
-            Color bulletColor = new Color(0, 255, 255); // Cyan default
-            // Could be improved by tracking bullet owner's team
+            Color bulletColor = new Color(0, 255, 255);
             
-            // NUCLEAR OPTION: Simple bullet rendering - just a circle and short line
-            // Simple circle for bullet
             gCopy.setColor(Color.YELLOW);
             gCopy.fillOval((int)(x - 4), (int)(y - 4), 8, 8);
             
-            // Simple short trail (just a line, no stored history)
             if (speed > 0.001) {
                 int trailX = (int)(x - nx * 15); // Fixed 15 pixel trail
                 int trailY = (int)(y - ny * 15);
@@ -105,4 +98,3 @@ public class BulletView
         return bullet;
     }
 }
-

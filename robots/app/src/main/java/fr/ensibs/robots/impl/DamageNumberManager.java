@@ -37,13 +37,13 @@ public class DamageNumberManager {
         }
     }
     
-    private List<DamageNumber> numbers = new ArrayList<>();
+    private final List<DamageNumber> numbers = new ArrayList<>();
     
-    public void addDamage(double x, double y, int damage) {
+    public synchronized void addDamage(double x, double y, int damage) {
         numbers.add(new DamageNumber(x, y, damage));
     }
     
-    public void update() {
+    public synchronized void update() {
         Iterator<DamageNumber> iter = numbers.iterator();
         while (iter.hasNext()) {
             DamageNumber num = iter.next();
@@ -55,9 +55,14 @@ public class DamageNumberManager {
     }
     
     public void draw(Graphics2D g) {
+        List<DamageNumber> snapshot;
+        synchronized (this) {
+            snapshot = new ArrayList<>(numbers);
+        }
+
         g.setFont(new Font("Monospaced", Font.BOLD, 16));
         
-        for (DamageNumber num : numbers) {
+        for (DamageNumber num : snapshot) {
             g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, num.alpha));
             g.setColor(Color.RED);
             g.drawString("-" + num.damage, (int)num.x, (int)num.y);
@@ -66,4 +71,3 @@ public class DamageNumberManager {
         g.setComposite(AlphaComposite.SrcOver);
     }
 }
-

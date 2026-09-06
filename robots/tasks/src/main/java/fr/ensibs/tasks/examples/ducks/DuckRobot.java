@@ -4,11 +4,10 @@ import fr.ensibs.robots.logic.*;
 
 import java.util.List;
 
-import static fr.ensibs.robots.logic.BattleSetup.*;
 import static fr.ensibs.tasks.examples.ducks.Utils.normalRelativeAngle;
 
 /**
- * NUCLEAR OPTION: Simple working AI for droid robot.
+ * Simple sample AI for droid robots.
  * 
  * <p>Simple behavior:
  * - Check for messages from leader
@@ -37,7 +36,6 @@ public class DuckRobot implements RobotTask<Robot>
     @Override
     public void run()
     {
-        // NUCLEAR OPTION: Simple working AI
         if (robot.getEnergy() <= 0) {
             return; // Dead
         }
@@ -60,7 +58,6 @@ public class DuckRobot implements RobotTask<Robot>
                                     targetX = Double.parseDouble(parts[1]);
                                     targetY = Double.parseDouble(parts[2]);
                                     hasTarget = true;
-                                    System.out.println("[DROID] Target received: (" + targetX + ", " + targetY + ")");
                                 } catch (NumberFormatException e) {
                                     // Ignore
                                 }
@@ -94,7 +91,6 @@ public class DuckRobot implements RobotTask<Robot>
                 try {
                     int power = gunTurnDegrees < 5 ? 3 : 1; // Max power if accurate
                     robot.fire(power);
-                    System.out.println("[DROID] FIRED power " + power + " at distance " + (int)distance);
                 } catch (GunOverheatedException | ExhaustedException e) {
                     // Ignore
                 }

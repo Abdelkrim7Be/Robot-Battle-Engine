@@ -183,11 +183,7 @@ class BaseDroid implements Droid
         if (!tryConsumeEnergy(BattleSetup.BODY_TURN_ENERGY)) {
             return;
         }
-        // Apply speed multiplier to reduce rotation speed (0.5 = 50% speed)
-        double adjustedDegrees = degrees * 0.5;
-        // Rotate body - this returns the delta that was applied
-        double bodyDelta = body.rotate(adjustedDegrees);
-        // Gun automatically follows body rotation
+        double bodyDelta = body.rotate(degrees);
         gun.onBodyRotated(bodyDelta);
     }
 
@@ -200,10 +196,7 @@ class BaseDroid implements Droid
         if (!tryConsumeEnergy(BattleSetup.GUN_TURN_ENERGY)) {
             return;
         }
-        // Apply speed multiplier to reduce gun rotation speed (0.5 = 50% speed)
-        double adjustedDegrees = degrees * 0.5;
-        // Gun rotates independently of body
-        gun.rotate(adjustedDegrees);
+        gun.rotate(degrees);
     }
     
     /**
@@ -537,4 +530,3 @@ class BaseDroid implements Droid
         this.energy = Math.min(maxEnergy, this.energy + amount);
     }
 }
-

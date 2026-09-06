@@ -269,7 +269,6 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
                         AppLog.debug("[TEAM LOADER] Loaded team: " + team.getName());
                     } catch (Exception e) {
                         System.err.println("Failed to load team from " + jarFile + ": " + e.getMessage());
-                        System.err.println(e.getMessage());
                     }
                 }
             }
@@ -375,7 +374,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
 
         int selectedIndex = availableTeamsList.getSelectedIndex();
         if (selectedIndex < 0 || selectedIndex >= availableTeams.size()) {
-            AppLog.debug("    OKOKERROR No team selected");
+            AppLog.debug("No team selected");
             JOptionPane.showMessageDialog(this,
                 "Please select a team from Available Teams",
                 "No Selection",
@@ -389,7 +388,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         // Check if already in battle
         for (TeamInfo battleTeam : battleTeams) {
             if (battleTeam.getName().equals(team.getName())) {
-                AppLog.debug("    OKOKERROR Team already in battle list");
+                AppLog.debug("Team already in battle list");
                 JOptionPane.showMessageDialog(this,
                     "Team already in battle: " + team.getName(),
                     "Already Added",

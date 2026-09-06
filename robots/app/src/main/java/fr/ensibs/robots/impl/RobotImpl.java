@@ -83,8 +83,7 @@ class RobotImpl extends BaseDroid implements Robot
         if (!tryConsumeEnergy(BattleSetup.RADAR_TURN_ENERGY)) {
             return;
         }
-        double adjustedDegrees = degrees * 0.5;
-        radar.rotate(adjustedDegrees);
+        radar.rotate(degrees);
     }
 
     @Override
@@ -103,5 +102,4 @@ class RobotImpl extends BaseDroid implements Robot
         this.task = task;
     }
 }
-
 

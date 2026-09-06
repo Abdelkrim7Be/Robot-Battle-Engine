@@ -1,25 +1,32 @@
-# Use Eclipse Temurin (recommended OpenJDK distribution) as base image
-FROM eclipse-temurin:17-jdk
+FROM eclipse-temurin:17-jdk AS build
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y \
-    libxtst6 \
-    libxi6 \
-    libxrender1 \
-    xauth \
-    x11-apps \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
+WORKDIR /workspace
 
 COPY api/ ./api/
 COPY libs/ ./libs/
 COPY robots/ ./robots/
 
+WORKDIR /workspace/robots
+RUN chmod +x ./gradlew && ./gradlew :app:installDist -x test --no-daemon
+
+FROM eclipse-temurin:17-jre
+
+ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:0
 
-WORKDIR /app/robots
-RUN chmod +x ./gradlew && ./gradlew :app:build -x test --no-daemon
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fontconfig \
+    libfreetype6 \
+    libxext6 \
+    libxi6 \
+    libxrender1 \
+    libxtst6 \
+    xauth \
+    && rm -rf /var/lib/apt/lists/*
 
-CMD ["./gradlew", ":app:run", "--no-daemon"]
+WORKDIR /app
+
+COPY --from=build /workspace/robots/app/build/install/app ./app/
+COPY libs/ ./libs/
+
+CMD ["./app/bin/app"]

@@ -19,7 +19,7 @@ tasks {
     }
 }
 
-val teamsDir = File(rootProject.projectDir, "teams")
+val teamsDir = File(rootProject.projectDir.parentFile, "libs")
 tasks.register("createTeamsDir") {
     doLast {
         teamsDir.mkdirs()

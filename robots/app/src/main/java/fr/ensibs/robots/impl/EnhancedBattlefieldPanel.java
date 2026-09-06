@@ -124,8 +124,7 @@ public class EnhancedBattlefieldPanel extends BattlefieldPanel
         // Draw additional drawable entities (bullets, particles, etc.)
         drawAdditionalEntities(g2d);
         
-        // DISABLED: Particle effects causing yellow spiral bug
-        // TODO: Fix particle system cleanup before re-enabling
+        // Particle effects are kept disabled until cleanup is stable.
         // particleSystem.draw(g2d);
         
         // Draw HUD overlay (in battlefield coordinates)

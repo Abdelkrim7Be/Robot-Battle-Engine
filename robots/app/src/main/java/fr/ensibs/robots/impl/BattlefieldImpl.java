@@ -42,7 +42,6 @@ class BattlefieldImpl implements Battlefield
     private final DamageTracker damageTracker = new DamageTracker();
     private final DamageNumberManager damageNumberManager = new DamageNumberManager();
 
-    private static final double SPEED_MULTIPLIER = 0.5;
     private GamePhaseManager phaseManager;
 
     private final ObjectPool<Bullet> bulletPool = new ObjectPool<>(() -> new Bullet(), 50, 200);
@@ -90,35 +89,45 @@ class BattlefieldImpl implements Battlefield
      */
     Location nextSpawn()
     {
-        int maxColumn = (BattleSetup.FIELD_WIDTH - 2 * BattleSetup.ROBOT_RADIUS) / BattleSetup.MAX_DISTANCE_MOVE;
-        int maxRow = (BattleSetup.FIELD_HEIGHT - 2 * BattleSetup.ROBOT_RADIUS) / BattleSetup.MAX_DISTANCE_MOVE;
+        int spawnMargin = BattleSetup.ROBOT_RADIUS + BattleSetup.MAX_DISTANCE_MOVE;
+        int maxColumn = (BattleSetup.FIELD_WIDTH - 2 * spawnMargin) / BattleSetup.MAX_DISTANCE_MOVE;
+        int maxRow = (BattleSetup.FIELD_HEIGHT - 2 * spawnMargin) / BattleSetup.MAX_DISTANCE_MOVE;
         
-        // Try random placement first (more natural distribution)
+        int index = robots.size();
+        int columns = Math.max(1, maxColumn + 1);
+        int rows = Math.max(1, maxRow + 1);
+        int slots = columns * rows;
+        for (int offset = 0; offset < slots; offset++) {
+            int slot = (index + offset) % slots;
+            int column = slot / rows;
+            int row = slot % rows;
+            int x = spawnMargin + column * BattleSetup.MAX_DISTANCE_MOVE;
+            int y = spawnMargin + row * BattleSetup.MAX_DISTANCE_MOVE;
+            Location candidate = new Location(
+                Math.min(x, BattleSetup.FIELD_WIDTH - spawnMargin),
+                Math.min(y, BattleSetup.FIELD_HEIGHT - spawnMargin)
+            );
+            if (isFree(candidate)) {
+                return candidate;
+            }
+        }
+
         int maxAttempts = 500;
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
-            int x = BattleSetup.ROBOT_RADIUS + BattleSetup.MAX_DISTANCE_MOVE * random.nextInt(Math.max(1, maxColumn + 1));
-            int y = BattleSetup.ROBOT_RADIUS + BattleSetup.MAX_DISTANCE_MOVE * random.nextInt(Math.max(1, maxRow + 1));
+            int x = spawnMargin + BattleSetup.MAX_DISTANCE_MOVE * random.nextInt(Math.max(1, maxColumn + 1));
+            int y = spawnMargin + BattleSetup.MAX_DISTANCE_MOVE * random.nextInt(Math.max(1, maxRow + 1));
             Location candidate = new Location(x, y);
             if (isFree(candidate)) {
                 return candidate;
             }
         }
-        
-        // Deterministic fallback: place robots on a grid to ensure spawnability
-        int index = robots.size();
-        int columns = Math.max(1, maxColumn + 1);
-        int row = index / columns;
-        int column = index % columns;
-        int x = BattleSetup.ROBOT_RADIUS + column * BattleSetup.MAX_DISTANCE_MOVE;
-        int y = BattleSetup.ROBOT_RADIUS + row * BattleSetup.MAX_DISTANCE_MOVE;
-        x = Math.min(x, BattleSetup.FIELD_WIDTH - BattleSetup.ROBOT_RADIUS);
-        y = Math.min(y, BattleSetup.FIELD_HEIGHT - BattleSetup.ROBOT_RADIUS);
-        return new Location(x, y);
+
+        throw new IllegalStateException("No free spawn location available");
     }
 
     double nextHeading()
     {
-        return random.nextDouble() * 360.0;
+        return 90.0;
     }
     
     /**
@@ -142,11 +151,11 @@ class BattlefieldImpl implements Battlefield
         if (side == 0) {
             // Left side, face right (toward enemy)
             teamX = margin + 50;
-            heading = 0; // Face right (East)
+            heading = 90; // Face right (East)
         } else {
             // Right side, face left (toward enemy)
             teamX = fieldWidth - margin - 50;
-            heading = 180; // Face left (West)
+            heading = 270; // Face left (West)
         }
         
         // Distribute robots vertically
@@ -827,8 +836,7 @@ class BattlefieldImpl implements Battlefield
     public void move(Droid robot, double distance) throws CollisionException, ExhaustedException
     {
         BaseDroid mover = requireDroid(robot);
-        double adjustedDistance = distance * SPEED_MULTIPLIER;
-        double limitedDistance = Math.max(BattleSetup.MIN_DISTANCE_MOVE, Math.min(BattleSetup.MAX_DISTANCE_MOVE, adjustedDistance));
+        double limitedDistance = Math.max(BattleSetup.MIN_DISTANCE_MOVE, Math.min(BattleSetup.MAX_DISTANCE_MOVE, distance));
         if (limitedDistance == 0) {
             return;
         }

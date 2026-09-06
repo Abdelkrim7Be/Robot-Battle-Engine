@@ -164,8 +164,7 @@ public class EnhancedBattlefieldFrame extends JFrame
                 taskFactory.loadJar(team.getJarFile());
                 AppLog.debug("    OK JAR loaded successfully");
             } catch (Exception e) {
-                System.err.println("    OKOKERROR Failed to reload JAR: " + e.getMessage());
-                System.err.println(e.getMessage());
+                System.err.println("Failed to reload JAR: " + e.getMessage());
                 continue; // Skip this team if JAR fails
             }
 
@@ -203,12 +202,11 @@ public class EnhancedBattlefieldFrame extends JFrame
                 if (engine != null) {
                     engine.addTask(leaderTask);
                 } else {
-                    System.err.println("      OKOKERROR ERROR: Engine is null! Cannot add leader task!");
+                    System.err.println("Engine is null; cannot add leader task.");
                 }
                 AppLog.debug("      OK Leader task created and added to engine");
             } catch (Exception e) {
-                System.err.println("      OKOKERROR Failed to create leader task: " + e.getMessage());
-                System.err.println(e.getMessage());
+                System.err.println("Failed to create leader task: " + e.getMessage());
             }
 
             // Create droid tasks
@@ -218,8 +216,7 @@ public class EnhancedBattlefieldFrame extends JFrame
             AppLog.debug("    Found " + droidClasses.size() + " droid classes");
 
             if (droidClasses.isEmpty()) {
-                System.err.println("    OKWARNINGWARNING WARNING: No droid classes found!");
-                System.err.println("    Attempting to reload JAR: " + team.getJarFile());
+                System.err.println("No droid classes found; attempting to reload JAR: " + team.getJarFile());
 
                 try {
                     // Reload the JAR to find droid classes
@@ -244,7 +241,7 @@ public class EnhancedBattlefieldFrame extends JFrame
             }
 
             if (droidClasses.isEmpty()) {
-                System.err.println("  ERROR: Still no droid classes found! Droids will not have tasks!");
+                System.err.println("No droid classes found after reload; droids will not have tasks.");
             } else {
                 // Assign droid tasks to all teammates
                 for (int i = 0; i < teammates.size(); i++) {
@@ -256,13 +253,12 @@ public class EnhancedBattlefieldFrame extends JFrame
                         if (engine != null) {
                             engine.addTask(droidTask);
                         } else {
-                            System.err.println("      OKOKERROR ERROR: Engine is null! Cannot add droid task!");
+                            System.err.println("Engine is null; cannot add droid task.");
                         }
                         droidTaskCount++;
                         AppLog.debug("    Created droid task " + (i+1) + " using " + droidClass.getSimpleName());
                     } catch (Exception e) {
                         System.err.println("    Failed to create droid task " + (i+1) + ": " + e.getMessage());
-                        System.err.println(e.getMessage());
                     }
                 }
             }
@@ -295,7 +291,7 @@ public class EnhancedBattlefieldFrame extends JFrame
             ((List<?>) bulletsField.get(battlefieldImpl)).clear();
             AppLog.debug("    OK Cleared existing robots and bullets");
         } catch (Exception e) {
-            System.err.println("    OKWARNINGWARNING Failed to clear battlefield: " + e.getMessage());
+            System.err.println("Failed to clear battlefield: " + e.getMessage());
         }
 
         int totalRobotsToSpawn = 0;
@@ -316,15 +312,15 @@ public class EnhancedBattlefieldFrame extends JFrame
             robotCount = robotsOnField.size();
             AppLog.debug("    Robots on battlefield after spawn: " + robotCount);
             if (robotCount != totalRobotsToSpawn) {
-                System.err.println("    OKWARNINGWARNING WARNING: Robot count mismatch! Expected " + totalRobotsToSpawn + ", got " + robotCount);
+                System.err.println("Robot count mismatch: expected " + totalRobotsToSpawn + ", got " + robotCount);
             }
         } catch (Exception e) {
-            System.err.println("    OKWARNINGWARNING Could not verify robot count: " + e.getMessage());
+            System.err.println("Could not verify robot count: " + e.getMessage());
         }
 
         AppLog.debug("\n>>> Starting battlefield engine...");
         if (engine == null) {
-            System.err.println("    OKOKERROR ERROR: Engine is null! Cannot start battle!");
+            System.err.println("Engine is null; cannot start battle.");
             return;
         }
 
@@ -337,7 +333,7 @@ public class EnhancedBattlefieldFrame extends JFrame
             int taskCount = tasks != null ? tasks.size() : 0;
             AppLog.debug("    Tasks in engine: " + taskCount);
             if (taskCount == 0) {
-                System.err.println("    OKWARNINGWARNING WARNING: No tasks in engine! Robots will not move!");
+                System.err.println("No tasks in engine; robots will not move.");
             }
         } catch (Exception e) {
             System.err.println("    Could not check task count: " + e.getMessage());
@@ -350,8 +346,7 @@ public class EnhancedBattlefieldFrame extends JFrame
             AppLog.debug("    Deployment countdown: 3 seconds");
             AppLog.debug("    After countdown, robots will start fighting!");
         } catch (Exception e) {
-            System.err.println("    OKOKERROR ERROR: Failed to start engine: " + e.getMessage());
-            System.err.println(e.getMessage());
+            System.err.println("Failed to start engine: " + e.getMessage());
             return;
         }
 
@@ -401,7 +396,7 @@ public class EnhancedBattlefieldFrame extends JFrame
         for (int teamIndex = 0; teamIndex < teamRobotLists.size(); teamIndex++) {
             List<BaseDroid> teamRobots = teamRobotLists.get(teamIndex);
             if (teamRobots.isEmpty()) {
-                System.err.println("    OKWARNINGWARNING Team " + (teamIndex + 1) + " has no robots, skipping");
+                System.err.println("Team " + (teamIndex + 1) + " has no robots, skipping.");
                 continue;
             }
 
@@ -413,11 +408,11 @@ public class EnhancedBattlefieldFrame extends JFrame
                 if (teamIndex == 0) {
                     teamX = margin + 50;
                     teamY = fieldHeight / 2;
-                    heading = 0; // Face right (East)
+                    heading = 90; // Face right (East)
                 } else {
                     teamX = fieldWidth - margin - 50;
                     teamY = fieldHeight / 2;
-                    heading = 180; // Face left (West)
+                    heading = 270; // Face left (West)
                 }
             } else if (totalTeams == 3) {
                 // Triangle formation
@@ -485,7 +480,7 @@ public class EnhancedBattlefieldFrame extends JFrame
                         AppLog.debug("      OK Registered robot " + (i + 1) + " to battlefield");
                     }
                 } catch (Exception e) {
-                    System.err.println("      OKOKERROR Failed to register robot: " + e.getMessage());
+                    System.err.println("Failed to register robot: " + e.getMessage());
                 }
 
                 AppLog.debug("      OK Spawned robot " + (i + 1) + " at (" + spawnX + ", " + spawnY + ") with heading " + heading);
@@ -1235,4 +1230,3 @@ public class EnhancedBattlefieldFrame extends JFrame
         return dashboard;
     }
 }
-

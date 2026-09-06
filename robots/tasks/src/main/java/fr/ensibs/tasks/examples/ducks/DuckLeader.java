@@ -4,11 +4,10 @@ import fr.ensibs.robots.logic.*;
 
 import java.util.List;
 
-import static fr.ensibs.robots.logic.BattleSetup.*;
 import static fr.ensibs.tasks.examples.ducks.Utils.normalRelativeAngle;
 
 /**
- * NUCLEAR OPTION: Simple working AI for leader robot.
+ * Simple sample AI for leader robots.
  * 
  * <p>Simple behavior:
  * - Always spin radar to find enemies
@@ -40,7 +39,6 @@ public class DuckLeader implements RobotTask<TeamLeader>
     @Override
     public void run()
     {
-        // NUCLEAR OPTION: Simple working AI
         if (leader.getEnergy() <= 0) {
             return; // Dead
         }
@@ -64,8 +62,6 @@ public class DuckLeader implements RobotTask<TeamLeader>
                 targetY = enemy.getY();
                 hasTarget = true;
                 
-                System.out.println("[LEADER] Enemy detected at (" + targetX + ", " + targetY + ")");
-                
                 // Broadcast to team
                 String targetMessage = "TARGET:" + targetX + ":" + targetY;
                 TeamMessage message = new TeamMessage(TeamMessage.MessageType.BROADCAST, targetMessage, leader);
@@ -88,7 +84,6 @@ public class DuckLeader implements RobotTask<TeamLeader>
                     try {
                         int power = gunTurnDegrees < 5 ? 3 : 1; // Max power if accurate
                         leader.fire(power);
-                        System.out.println("[LEADER] FIRED power " + power);
                     } catch (GunOverheatedException | ExhaustedException e) {
                         // Ignore
                     }
@@ -122,4 +117,3 @@ public class DuckLeader implements RobotTask<TeamLeader>
         }
     }
 }
-

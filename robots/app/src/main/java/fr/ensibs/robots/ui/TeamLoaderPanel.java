@@ -2,6 +2,7 @@ package fr.ensibs.robots.ui;
 
 import fr.ensibs.robots.factories.BattleFactory;
 import fr.ensibs.robots.factories.RobotTaskFactory;
+import fr.ensibs.robots.impl.AppLog;
 import fr.ensibs.robots.impl.RobotLoader;
 import fr.ensibs.robots.impl.TeamInfo;
 
@@ -16,7 +17,7 @@ import java.util.List;
 
 /**
  * Panel for loading teams from JAR files and configuring battles.
- * 
+ *
  * <p>Provides UI for:
  * <ul>
  *   <li>Loading team JAR files</li>
@@ -31,11 +32,11 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
     private static final String ADD_TO_BATTLE = "Add to Battle";
     private static final String REMOVE = "Remove";
     private static final String START_BATTLE = "START BATTLE";
-    
+
     private final RobotLoader robotLoader;
     private final BattleFactory battleFactory;
     private final RobotTaskFactory taskFactory;
-    
+
     // UI Components
     private DefaultListModel<String> availableTeamsModel;
     private JList<String> availableTeamsList;
@@ -43,15 +44,15 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
     private JList<String> battleTeamsList;
     private JComboBox<String> colorComboBox;
     private JButton startBattleButton;
-    
+
     // Data
     private final List<TeamInfo> availableTeams;
     private final List<TeamInfo> battleTeams;
     private final Color[] availableColors;
-    
+
     // Callback for starting battle
     private BattleStartCallback battleStartCallback;
-    
+
     /**
      * Callback interface for when battle starts.
      */
@@ -59,15 +60,15 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
     {
         /**
          * Called when START BATTLE is clicked.
-         * 
+         *
          * @param teams the list of teams to battle
          */
         void onBattleStart(List<TeamInfo> teams);
     }
-    
+
     /**
      * Constructor
-     * 
+     *
      * @param robotLoader the robot loader
      * @param battleFactory the battle factory
      * @param taskFactory the task factory
@@ -80,7 +81,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         this.taskFactory = taskFactory;
         this.availableTeams = new ArrayList<>();
         this.battleTeams = new ArrayList<>();
-        
+
         // Available colors
         this.availableColors = new Color[]{
             new Color(0, 255, 255),    // Cyan
@@ -92,21 +93,21 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             new Color(0, 0, 255),       // Blue
             new Color(255, 192, 203)    // Pink
         };
-        
+
         initComponents();
         autoLoadDefaultTeams();
     }
-    
+
     /**
      * Set the callback for when battle starts.
-     * 
+     *
      * @param callback the callback
      */
     public void setBattleStartCallback(BattleStartCallback callback)
     {
         this.battleStartCallback = callback;
     }
-    
+
     /**
      * Initialize UI components.
      */
@@ -115,22 +116,22 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         setBackground(new Color(13, 13, 13));
         setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(new Color(51, 51, 51), 2),
-            "⚔ BATTLE CONFIGURATION ⚔",
+            "BATTLE CONFIGURATION",
             TitledBorder.CENTER,
             TitledBorder.TOP,
             new Font("Monospaced", Font.BOLD, 16),
             new Color(0, 255, 0))); // Terminal Green
-        
+
         // Title section (already in border)
-        
+
         // Main content panel
         JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
         contentPanel.setBackground(new Color(13, 13, 13));
-        
+
         // Teams lists section (two lists side by side)
         JPanel listsPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         listsPanel.setBackground(new Color(13, 13, 13));
-        
+
         // Left list - Available Teams
         JPanel availablePanel = new JPanel(new BorderLayout(5, 5));
         availablePanel.setBackground(new Color(13, 13, 13));
@@ -141,7 +142,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             TitledBorder.TOP,
             new Font("Monospaced", Font.BOLD, 12),
             new Color(0, 255, 0)));
-        
+
         availableTeamsModel = new DefaultListModel<>();
         availableTeamsList = new JList<>(availableTeamsModel);
         availableTeamsList.setBackground(new Color(30, 30, 30));
@@ -152,7 +153,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         availableScroll.setPreferredSize(new Dimension(200, 150));
         availablePanel.add(availableScroll, BorderLayout.CENTER);
         listsPanel.add(availablePanel);
-        
+
         // Right list - Battle Teams
         JPanel battlePanel = new JPanel(new BorderLayout(5, 5));
         battlePanel.setBackground(new Color(13, 13, 13));
@@ -163,7 +164,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             TitledBorder.TOP,
             new Font("Monospaced", Font.BOLD, 12),
             new Color(0, 255, 0)));
-        
+
         battleTeamsModel = new DefaultListModel<>();
         battleTeamsList = new JList<>(battleTeamsModel);
         battleTeamsList.setBackground(new Color(30, 30, 30));
@@ -174,20 +175,20 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         battleScroll.setPreferredSize(new Dimension(200, 150));
         battlePanel.add(battleScroll, BorderLayout.CENTER);
         listsPanel.add(battlePanel);
-        
+
         contentPanel.add(listsPanel, BorderLayout.CENTER);
-        
+
         // Controls section (buttons and color dropdown)
         JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         controlsPanel.setBackground(new Color(13, 13, 13));
-        
+
         // Load Team JAR button
         JButton loadJarButton = new JButton(LOAD_JAR);
         styleButton(loadJarButton);
         loadJarButton.setActionCommand(LOAD_JAR);
         loadJarButton.addActionListener(this);
         controlsPanel.add(loadJarButton);
-        
+
         // Color dropdown
         String[] colorNames = {"Cyan", "Red", "Orange", "Magenta", "Green", "Yellow", "Blue", "Pink"};
         colorComboBox = new JComboBox<>(colorNames);
@@ -196,23 +197,23 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         colorComboBox.setFont(new Font("Monospaced", Font.PLAIN, 11));
         controlsPanel.add(new JLabel("Color:"));
         controlsPanel.add(colorComboBox);
-        
+
         // Add to Battle button
         JButton addButton = new JButton(ADD_TO_BATTLE);
         styleButton(addButton);
         addButton.setActionCommand(ADD_TO_BATTLE);
         addButton.addActionListener(this);
         controlsPanel.add(addButton);
-        
+
         // Remove button
         JButton removeButton = new JButton(REMOVE);
         styleButton(removeButton);
         removeButton.setActionCommand(REMOVE);
         removeButton.addActionListener(this);
         controlsPanel.add(removeButton);
-        
+
         contentPanel.add(controlsPanel, BorderLayout.SOUTH);
-        
+
         // START BATTLE button (prominent, at bottom)
         startBattleButton = new JButton(START_BATTLE);
         startBattleButton.setFont(new Font("Monospaced", Font.BOLD, 14));
@@ -222,15 +223,15 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         startBattleButton.setActionCommand(START_BATTLE);
         startBattleButton.addActionListener(this);
         startBattleButton.setEnabled(false); // Disabled until 2+ teams added
-        
+
         JPanel startPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         startPanel.setBackground(new Color(13, 13, 13));
         startPanel.add(startBattleButton);
-        
+
         add(contentPanel, BorderLayout.CENTER);
         add(startPanel, BorderLayout.SOUTH);
     }
-    
+
     /**
      * Style a button with dark theme.
      */
@@ -242,7 +243,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         button.setBorder(BorderFactory.createLineBorder(new Color(51, 51, 51), 1));
         button.setFocusPainted(false);
     }
-    
+
     /**
      * Auto-load default teams from libs/ directory.
      */
@@ -255,20 +256,20 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         if (!libsDir.exists()) {
             libsDir = new File("../../libs");
         }
-        
+
         if (libsDir.exists() && libsDir.isDirectory()) {
             File[] jarFiles = libsDir.listFiles((dir, name) -> name.endsWith(".jar"));
             if (jarFiles != null) {
-                System.out.println("[TEAM LOADER] Found " + jarFiles.length + " JAR files in " + libsDir.getAbsolutePath());
+                AppLog.debug("[TEAM LOADER] Found " + jarFiles.length + " JAR files in " + libsDir.getAbsolutePath());
                 for (File jarFile : jarFiles) {
                     try {
                         TeamInfo team = robotLoader.loadTeamFromJar(jarFile);
                         availableTeams.add(team);
                         availableTeamsModel.addElement(team.getName());
-                        System.out.println("[TEAM LOADER] Loaded team: " + team.getName());
+                        AppLog.debug("[TEAM LOADER] Loaded team: " + team.getName());
                     } catch (Exception e) {
                         System.err.println("Failed to load team from " + jarFile + ": " + e.getMessage());
-                        e.printStackTrace();
+                        System.err.println(e.getMessage());
                     }
                 }
             }
@@ -276,12 +277,12 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             System.err.println("[TEAM LOADER] libs directory not found. Tried: libs, ../libs, ../../libs");
         }
     }
-    
+
     @Override
     public void actionPerformed(ActionEvent e)
     {
         String command = e.getActionCommand();
-        
+
         switch (command) {
             case LOAD_JAR:
                 loadTeamJar();
@@ -297,7 +298,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
                 break;
         }
     }
-    
+
     /**
      * Load a team JAR file.
      */
@@ -309,13 +310,13 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             public boolean accept(File f) {
                 return f.isDirectory() || f.getName().toLowerCase().endsWith(".jar");
             }
-            
+
             @Override
             public String getDescription() {
                 return "JAR Files (*.jar)";
             }
         });
-        
+
         // Default to libs/ directory
         File libsDir = new File("libs");
         if (!libsDir.exists()) {
@@ -327,13 +328,13 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         if (libsDir.exists()) {
             fileChooser.setCurrentDirectory(libsDir);
         }
-        
+
         int result = fileChooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
             File jarFile = fileChooser.getSelectedFile();
             try {
                 TeamInfo team = robotLoader.loadTeamFromJar(jarFile);
-                
+
                 // Check if team already loaded
                 boolean alreadyExists = false;
                 for (TeamInfo existing : availableTeams) {
@@ -342,11 +343,11 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
                         break;
                     }
                 }
-                
+
                 if (!alreadyExists) {
                     availableTeams.add(team);
                     availableTeamsModel.addElement(team.getName());
-                    JOptionPane.showMessageDialog(this, 
+                    JOptionPane.showMessageDialog(this,
                         "Team loaded successfully: " + team.getName(),
                         "Success",
                         JOptionPane.INFORMATION_MESSAGE);
@@ -364,31 +365,31 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
             }
         }
     }
-    
+
     /**
      * Add selected team to battle.
      */
     private void addToBattle()
     {
-        System.out.println("\n>>> Add to Battle clicked");
-        
+        AppLog.debug("\n>>> Add to Battle clicked");
+
         int selectedIndex = availableTeamsList.getSelectedIndex();
         if (selectedIndex < 0 || selectedIndex >= availableTeams.size()) {
-            System.out.println("    ✗ No team selected");
+            AppLog.debug("    OKOKERROR No team selected");
             JOptionPane.showMessageDialog(this,
                 "Please select a team from Available Teams",
                 "No Selection",
                 JOptionPane.WARNING_MESSAGE);
             return;
         }
-        
+
         TeamInfo team = availableTeams.get(selectedIndex);
-        System.out.println("    Selected team: " + team.getName());
-        
+        AppLog.debug("    Selected team: " + team.getName());
+
         // Check if already in battle
         for (TeamInfo battleTeam : battleTeams) {
             if (battleTeam.getName().equals(team.getName())) {
-                System.out.println("    ✗ Team already in battle list");
+                AppLog.debug("    OKOKERROR Team already in battle list");
                 JOptionPane.showMessageDialog(this,
                     "Team already in battle: " + team.getName(),
                     "Already Added",
@@ -396,7 +397,7 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
                 return;
             }
         }
-        
+
         // Get selected color
         int colorIndex = colorComboBox.getSelectedIndex();
         if (colorIndex < 0 || colorIndex >= availableColors.length) {
@@ -404,26 +405,26 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         }
         Color selectedColor = availableColors[colorIndex];
         team.setColor(selectedColor);
-        System.out.println("    Color assigned: " + colorComboBox.getSelectedItem() + " (RGB: " + 
+        AppLog.debug("    Color assigned: " + colorComboBox.getSelectedItem() + " (RGB: " +
                           selectedColor.getRed() + "," + selectedColor.getGreen() + "," + selectedColor.getBlue() + ")");
-        System.out.println("    Team color after set: " + team.getColor() + " (RGB: " + 
+        AppLog.debug("    Team color after set: " + team.getColor() + " (RGB: " +
                           team.getColor().getRed() + "," + team.getColor().getGreen() + "," + team.getColor().getBlue() + ")");
-        
+
         // Add to battle
         battleTeams.add(team);
         battleTeamsModel.addElement(team.getName() + " [" + colorComboBox.getSelectedItem() + "]");
-        System.out.println("    ✓ Team added to battle list");
-        System.out.println("    Battle teams count: " + battleTeams.size());
-        
+        AppLog.debug("    OK Team added to battle list");
+        AppLog.debug("    Battle teams count: " + battleTeams.size());
+
         // Auto-advance to next color
         colorComboBox.setSelectedIndex((colorIndex + 1) % availableColors.length);
-        
+
         // Enable START BATTLE if 2+ teams
         boolean canStart = battleTeams.size() >= 2;
         startBattleButton.setEnabled(canStart);
-        System.out.println("    START BATTLE button enabled: " + canStart);
+        AppLog.debug("    START BATTLE button enabled: " + canStart);
     }
-    
+
     /**
      * Remove selected team from battle.
      */
@@ -437,14 +438,14 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
                 JOptionPane.WARNING_MESSAGE);
             return;
         }
-        
+
         battleTeams.remove(selectedIndex);
         battleTeamsModel.remove(selectedIndex);
-        
+
         // Disable START BATTLE if less than 2 teams
         startBattleButton.setEnabled(battleTeams.size() >= 2);
     }
-    
+
     /**
      * Start the battle.
      */
@@ -457,12 +458,12 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
                 JOptionPane.WARNING_MESSAGE);
             return;
         }
-        
+
         if (battleStartCallback != null) {
             battleStartCallback.onBattleStart(new ArrayList<>(battleTeams));
         }
     }
-    
+
     /**
      * Clear all teams from battle (reset).
      */
@@ -473,4 +474,3 @@ public class TeamLoaderPanel extends JPanel implements ActionListener
         startBattleButton.setEnabled(false);
     }
 }
-

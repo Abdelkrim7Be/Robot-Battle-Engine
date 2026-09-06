@@ -453,10 +453,6 @@ public class ControlsPanel extends JPanel implements ActionListener
             return this;
         }
         
-        /**
-         * MISSION 4: Determine team color based on robot name.
-         * Duck -> CYAN (Blue), Snail -> RED, fallback to assigned color.
-         */
         private Color determineTeamColor(DroidView<? extends Droid> view)
         {
             String name = view.getName().toLowerCase();
@@ -465,7 +461,6 @@ public class ControlsPanel extends JPanel implements ActionListener
             } else if (name.contains("snail")) {
                 return Color.RED;
             }
-            // Fallback to assigned color
             return view.getColor();
         }
     }
@@ -521,7 +516,7 @@ public class ControlsPanel extends JPanel implements ActionListener
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Failed to load robot classes: " + e.getMessage());
         }
     }
 

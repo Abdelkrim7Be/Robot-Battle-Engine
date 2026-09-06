@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   robots-app:
     build:
@@ -8,10 +6,6 @@ services:
     container_name: robot-wars-app
     environment:
       - DISPLAY=${DISPLAY:-host.docker.internal:0}
-    # X11 socket mount (Linux only - comment out on Windows/Mac)
-    # volumes:
-    #   - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    # network_mode: host  # Linux only
-    # For Windows/Mac: use host.docker.internal for X11 forwarding
-    # Make sure X11 server (VcXsrv/Xming on Windows, XQuartz on Mac) is running
-
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    network_mode: host

@@ -58,7 +58,6 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
             throw new IllegalStateException("Failed to load jar file " + jarFile, e);
         }
 
-        // MISSION 5.2: Harden reflection loader with exception handling
         try {
             classLoader = new BytecodeClassLoader(classData, RobotTaskFactoryImpl.class.getClassLoader());
             for (String className : classData.keySet()) {
@@ -71,7 +70,6 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
                     if (robotType == null) {
                         continue;
                     }
-                    // MISSION 5.2: Wrap in try-catch to handle casting exceptions
                     try {
                         if (TeamLeader.class.isAssignableFrom(robotType)) {
                             leaderClasses.add((Class<? extends RobotTask<TeamLeader>>) clazz.asSubclass(RobotTask.class));
@@ -79,23 +77,19 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
                             robotClasses.add((Class<? extends RobotTask<Robot>>) clazz.asSubclass(RobotTask.class));
                         }
                     } catch (ClassCastException | IllegalArgumentException e) {
-                        // MISSION 5.2: Skip invalid classes instead of crashing
                         System.err.println("[RobotTaskFactory] Skipping invalid class: " + className + " - " + e.getMessage());
                         continue;
                     }
                 } catch (ClassNotFoundException | LinkageError e) {
-                    // MISSION 5.2: Skip classes that can't be loaded instead of crashing
                     // Note: NoClassDefFoundError is a subclass of LinkageError, so catch LinkageError only
                     System.err.println("[RobotTaskFactory] Failed to load class: " + className + " - " + e.getMessage());
                     continue;
                 } catch (Exception e) {
-                    // MISSION 5.2: Catch any other exceptions during class loading
                     System.err.println("[RobotTaskFactory] Unexpected error loading class: " + className + " - " + e.getMessage());
                     continue;
                 }
             }
         } catch (Exception e) {
-            // MISSION 5.2: Don't crash if classloader creation fails, just log and continue
             System.err.println("[RobotTaskFactory] Failed to create classloader from " + jarFile + " - " + e.getMessage());
             // Continue with empty class lists rather than crashing
         }
@@ -116,7 +110,6 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
     @Override
     public RobotTask<Robot> makeRobotTask(Class<? extends RobotTask<Robot>> clazz)
     {
-        // MISSION 5.2: Harden instantiation with comprehensive exception handling
         try {
             return clazz.getDeclaredConstructor().newInstance();
         } catch (NoSuchMethodException e) {
@@ -135,10 +128,10 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
             System.err.println("[RobotTaskFactory] Reflection error for " + clazz.getName() + ": " + e.getMessage());
             throw new IllegalStateException("Failed to instantiate " + clazz.getName(), e);
         } catch (Exception e) {
-            // MISSION 5.2: Catch any other exceptions (e.g., from constructor code)
             System.err.println("[RobotTaskFactory] Unexpected error instantiating " + clazz.getName() + ": " + e.getMessage());
-            if (e.getCause() != null) {
-                e.getCause().printStackTrace();
+            Throwable cause = e.getCause();
+            if (cause != null) {
+                System.err.println("[RobotTaskFactory] Cause: " + cause.getMessage());
             }
             throw new IllegalStateException("Failed to instantiate " + clazz.getName() + ": " + e.getMessage(), e);
         }
@@ -147,7 +140,6 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
     @Override
     public RobotTask<TeamLeader> makeLeaderTask(Class<? extends RobotTask<TeamLeader>> clazz)
     {
-        // MISSION 5.2: Harden instantiation with comprehensive exception handling
         try {
             return clazz.getDeclaredConstructor().newInstance();
         } catch (NoSuchMethodException e) {
@@ -166,10 +158,10 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
             System.err.println("[RobotTaskFactory] Reflection error for " + clazz.getName() + ": " + e.getMessage());
             throw new IllegalStateException("Failed to instantiate " + clazz.getName(), e);
         } catch (Exception e) {
-            // MISSION 5.2: Catch any other exceptions (e.g., from constructor code)
             System.err.println("[RobotTaskFactory] Unexpected error instantiating " + clazz.getName() + ": " + e.getMessage());
-            if (e.getCause() != null) {
-                e.getCause().printStackTrace();
+            Throwable cause = e.getCause();
+            if (cause != null) {
+                System.err.println("[RobotTaskFactory] Cause: " + cause.getMessage());
             }
             throw new IllegalStateException("Failed to instantiate " + clazz.getName() + ": " + e.getMessage(), e);
         }
@@ -229,7 +221,6 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
         @Override
         protected Class<?> findClass(String name) throws ClassNotFoundException
         {
-            // MISSION 5.2: Harden class loading with exception handling
             byte[] bytes = classes.get(name);
             if (bytes == null) {
                 throw new ClassNotFoundException(name);
@@ -238,15 +229,12 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
                 byte[] patched = patchVersion(bytes);
                 return defineClass(name, patched, 0, patched.length);
             } catch (ClassFormatError e) {
-                // MISSION 5.2: Handle malformed class files gracefully
                 System.err.println("[BytecodeClassLoader] Invalid class format for " + name + ": " + e.getMessage());
                 throw new ClassNotFoundException("Invalid class format: " + name, e);
             } catch (LinkageError e) {
-                // MISSION 5.2: Handle linkage errors (e.g., duplicate class definitions)
                 System.err.println("[BytecodeClassLoader] Linkage error for " + name + ": " + e.getMessage());
                 throw new ClassNotFoundException("Linkage error: " + name, e);
             } catch (Exception e) {
-                // MISSION 5.2: Catch any other exceptions during class definition
                 System.err.println("[BytecodeClassLoader] Unexpected error defining class " + name + ": " + e.getMessage());
                 throw new ClassNotFoundException("Error defining class: " + name, e);
             }
@@ -266,4 +254,3 @@ public class RobotTaskFactoryImpl implements RobotTaskFactory, AutoCloseable
         }
     }
 }
-

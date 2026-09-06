@@ -1,0 +1,16 @@
+.git/
+**/.gradle/
+**/build/
+**/bin/
+**/out/
+**/tmp/
+**/test-results/
+**/reports/
+
+.idea/
+.vscode/
+*.iml
+*.log
+
+.DS_Store
+Thumbs.db

@@ -31,7 +31,3 @@ Thumbs.db
 
 # Compiled classes
 **/*.class
-
-# JAR files (will be built in container)
-**/*.jar
-

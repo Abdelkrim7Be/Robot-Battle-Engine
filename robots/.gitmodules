@@ -1,0 +1,6 @@
+[submodule "api"]
+	path = api
+	url = git@forgens.univ-ubs.fr:pooa/project/api.git
+[submodule "libs"]
+	path = libs
+	url = git@forgens.univ-ubs.fr:pooa/project/libs.git

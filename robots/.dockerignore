@@ -1,0 +1,37 @@
+# Build artifacts
+**/build/
+**/bin/
+**/out/
+**/.gradle/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitmodules
+
+# Test results
+**/test-results/
+**/reports/
+
+# Temporary files
+**/tmp/
+**/*.log
+
+# Compiled classes
+**/*.class
+
+# JAR files (will be built in container)
+**/*.jar
+

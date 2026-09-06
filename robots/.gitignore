@@ -1,0 +1,19 @@
+# Build directories
+.gradle/
+.idea/
+build/
+app/build/
+app/bin/
+tasks/build/
+tasks/bin/
+
+# Documentation files (for personal reference only)
+*.md
+
+.idea/
+*.iml
+.vscode/
+*.class
+build/
+.gradle/
+out/

@@ -1,6 +1,6 @@
-# Robot Wars Battle Engine
-
 <div align="center">
+
+<h1>Robot Wars Battle Engine</h1>
 
 Programmable Java robot battles with real-time combat, runtime team loading, autonomous droids, leader coordination, and a neon terminal-style Swing interface.
 
